@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "name": "City Block",
+    "desc": "Skyscrapers and city buildings at night",
+    "gradient": "linear-gradient(180deg,#08080e,#181830)"
+  },
+  "objects": [
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [1.5, 4, 1.5, 2, 2, 2] },
+      "name": "Tower A",
+      "position": [-3, 2, -2], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.28, 0.33, 0.48], "rough": 0.7, "metal": 0.2
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [2, 2.5, 1.8, 2, 2, 2] },
+      "name": "Block B",
+      "position": [0, 1.25, -3], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.38, 0.38, 0.45], "rough": 0.75, "metal": 0.15
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [1.2, 6, 1.2, 2, 2, 2] },
+      "name": "Skyscraper C",
+      "position": [3, 3, -2], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.32, 0.38, 0.52], "rough": 0.5, "metal": 0.4
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [2.5, 1.5, 2, 2, 2, 2] },
+      "name": "Warehouse D",
+      "position": [-2, 0.75, 2], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.42, 0.35, 0.35], "rough": 0.85, "metal": 0.05
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [1, 3.5, 1, 2, 2, 2] },
+      "name": "Office E",
+      "position": [1.5, 1.75, 1], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.3, 0.38, 0.55], "rough": 0.6, "metal": 0.3
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [3, 1, 2.5, 2, 2, 2] },
+      "name": "Depot F",
+      "position": [4, 0.5, 2], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.4, 0.38, 0.36], "rough": 0.9, "metal": 0.0
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [1, 8, 1, 2, 2, 2] },
+      "name": "Antenna",
+      "position": [-4.5, 4, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.26, 0.32, 0.5], "rough": 0.55, "metal": 0.5
+    },
+    {
+      "type": "mesh",
+      "geometry": { "type": "BoxGeometry", "params": [1.8, 2, 1.5, 2, 2, 2] },
+      "name": "Building H",
+      "position": [0.5, 1, 2.5], "rotation": [0, 0, 0], "scale": [1, 1, 1],
+      "color": [0.35, 0.33, 0.42], "rough": 0.7, "metal": 0.1
+    }
+  ],
+  "lights": [
+    { "name": "Street Light", "position": [0, 5, 0],  "color": [1.0, 0.9, 0.65], "intensity": 1.0 },
+    { "name": "Blue Accent",  "position": [5, 4, -3], "color": [0.5, 0.65, 1.0], "intensity": 1.0 }
+  ],
+  "sky": {
+    "type": "shader",
+    "top": [0.01, 0.032, 0.2],
+    "mid": [0.014, 0.038, 0.13],
+    "bot": [0.0, 0.0, 0.022],
+    "horizon": 0.22,
+    "starDensity": 0.80,
+    "starBright": 0.45,
+    "nebulaAmt": 0.0
+  }
+}
