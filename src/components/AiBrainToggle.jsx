@@ -1,14 +1,10 @@
 import { useApp } from '../context/AppContext.jsx'
 
 const PRO_PLUS = new Set(['pro', 'premium'])
-// While we build out subscriptions the brain toggle stays visible to everyone
-// for development. Flip this to false at launch.
-const DEV_BRAIN_TOGGLE_FOR_ALL = true
 
 export default function AiBrainToggle() {
   const { aiBrain, setAiBrain, plan } = useApp()
-  const visible = DEV_BRAIN_TOGGLE_FOR_ALL || PRO_PLUS.has(plan)
-  if (!visible) return null
+  if (!PRO_PLUS.has(plan)) return null
   return (
     <div className="brain-row">
       <span className="brain-row-label">AI</span>
