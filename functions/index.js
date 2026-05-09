@@ -28,6 +28,7 @@ const COST = { gen: 10, chat: 2 }
 // full credits regardless of subscription status. Add yourself here.
 const DEV_EMAILS = new Set([
   'thesaberkid@outlook.com',
+  'thesaberkis@outlook.com',
   'mhwetmore@gmail.com',
 ])
 
