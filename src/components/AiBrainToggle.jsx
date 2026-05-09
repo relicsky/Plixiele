@@ -7,7 +7,6 @@ const PRO_PLUS = new Set(['pro', 'premium'])
 // to the AI client. minPlan controls visibility/disabled state.
 const OPTIONS = [
   { value: 'gemini-flash', label: 'Gemini Flash', brain: 'gemini', variant: 'flash',   minPlan: 'free'    },
-  { value: 'gemini-pro',   label: 'Gemini Pro',   brain: 'gemini', variant: 'pro',     minPlan: 'pro'     },
   { value: 'claude-sonnet',label: 'Claude Sonnet',brain: 'claude', variant: 'pro',     minPlan: 'pro'     },
   { value: 'claude-opus',  label: 'Claude Opus',  brain: 'claude', variant: 'premium', minPlan: 'premium' },
 ]
@@ -27,7 +26,7 @@ export default function AiBrainToggle() {
     ? explicit.value
     : aiBrain === 'claude'
       ? (plan === 'premium' ? 'claude-opus' : 'claude-sonnet')
-      : (plan === 'free'    ? 'gemini-flash' : 'gemini-pro')
+      : 'gemini-flash'
 
   function onChange(e) {
     const opt = OPTIONS.find(o => o.value === e.target.value)

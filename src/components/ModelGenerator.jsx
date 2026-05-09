@@ -56,7 +56,7 @@ export default function ModelGenerator() {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
       const generate = aiBrain === 'gemini' ? geminiGenerate : claudeGenerate
       const variant = aiVariant || (aiBrain === 'gemini'
-        ? (plan === 'free' || plan === 'basic' ? 'flash' : 'pro')
+        ? 'flash'
         : (plan === 'premium' ? 'premium' : 'pro'))
       const data = await generate(text, effective, { onStatus: setStatus, variant })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''

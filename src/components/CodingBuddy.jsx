@@ -113,7 +113,7 @@ export default function CodingBuddy() {
 
     try {
       const variant = aiVariant || (aiBrain === 'gemini'
-        ? (plan === 'free' || plan === 'basic' ? 'flash' : 'pro')
+        ? 'flash'
         : (plan === 'premium' ? 'premium' : 'pro'))
       await streamCodingReply(apiMessages, {
         brain: aiBrain,
