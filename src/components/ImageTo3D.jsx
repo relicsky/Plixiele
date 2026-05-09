@@ -6,6 +6,7 @@ import ThreeViewer from './ThreeViewer.jsx'
 import CodeOutput from './CodeOutput.jsx'
 import RendererSelect from './RendererSelect.jsx'
 import ModelGallery from './ModelGallery.jsx'
+import AiBrainToggle from './AiBrainToggle.jsx'
 import { IconUpload, IconSend } from './Icons.jsx'
 
 const STATUS = { loading: 'Analyzing image…', writing: 'Generating…' }
@@ -156,6 +157,7 @@ export default function ImageTo3D() {
           <div ref={endRef} />
         </div>
 
+        <AiBrainToggle />
         <form className="chat-bar" onSubmit={e => { e.preventDefault(); send(input) }}>
           <input
             value={input} onChange={e => setInput(e.target.value)}

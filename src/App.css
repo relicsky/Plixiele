@@ -548,6 +548,14 @@
   background: rgba(124,58,237,.14); color: var(--accent);
   box-shadow: inset 0 0 0 1px rgba(124,58,237,.4);
 }
+.brain-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px 0;
+}
+.brain-row-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-3);
+}
 
 .chat-col-header {
   padding: 10px 12px;
