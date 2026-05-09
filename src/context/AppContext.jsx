@@ -1,11 +1,12 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import * as S from '../lib/storage.js'
+import { signOutUser, onAuthChange } from '../lib/firebaseAuth.js'
 
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
 
 export function AppProvider({ children }) {
-  const [user, setUser]         = useState(() => S.getUser())
+  const [user, setUser]         = useState(null)
   const [mode, setMode]         = useState('model')
   const [renderer, setRenderer] = useState('threejs')
   const [shaderLang, setShaderLang] = useState('glsl')
@@ -14,18 +15,27 @@ export function AppProvider({ children }) {
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
   const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
 
-  function signIn(name, email) {
-    const u = { name, email, createdAt: Date.now() }
-    S.saveUser(u)
-    setUser(u)
-    setSessions(S.getSessions())
-  }
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthChange((firebaseUser) => {
+      setUser(firebaseUser)
+      if (firebaseUser) {
+        setSessions(S.getSessions())
+      }
+    })
+    return unsubscribe
+  }, [])
 
-  function signOut() {
-    S.clearUser()
-    setUser(null)
-    setSessions([])
-    setActiveId({ model: null, image: null, code: null })
+  async function handleSignOut() {
+    try {
+      await signOutUser()
+      S.clearUser()
+      setUser(null)
+      setSessions([])
+      setActiveId({ model: null, image: null, code: null })
+    } catch (error) {
+      console.error('Sign out failed:', error)
+    }
   }
 
   const createSession = useCallback((m) => {
@@ -110,7 +120,7 @@ export function AppProvider({ children }) {
 
   return (
     <Ctx.Provider value={{
-      user, signIn, signOut,
+      user, setUser, signOut: handleSignOut,
       mode, setMode,
       renderer, setRenderer,
       shaderLang, setShaderLang,
