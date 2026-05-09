@@ -58,9 +58,10 @@ function MiniViewer({ modelData }) {
 
 function ModelCard({ model, isUserPost, onDelete }) {
   const [hovered, setHovered] = useState(false)
-  const { setMode, createSession, updateSession } = useApp()
+  const { setMode, setRenderer, setShaderLang, createSession, updateSession } = useApp()
+  const hasHlsl = !!model.hlsl
 
-  function loadModel() {
+  function loadGlsl() {
     const sess = createSession('model')
     const data = { ...model.modelData, timestamp: Date.now() }
     const aMsg = {
@@ -69,6 +70,29 @@ function ModelCard({ model, isUserPost, onDelete }) {
       modelData: data, ts: Date.now(),
     }
     updateSession(sess.id, { messages: [aMsg], modelData: data, title: model.title })
+    setRenderer('threejs')
+    setShaderLang('glsl')
+    setMode('model')
+  }
+
+  function loadHlsl() {
+    if (!model.hlsl) return
+    const sess = createSession('model')
+    const data = {
+      type: 'hlsl',
+      renderer: 'hlsl',
+      description: model.modelData.description,
+      code: model.hlsl,
+      timestamp: Date.now(),
+    }
+    const aMsg = {
+      role: 'assistant',
+      content: `✦ ${data.description} — HLSL shader`,
+      modelData: data, ts: Date.now(),
+    }
+    updateSession(sess.id, { messages: [aMsg], modelData: data, title: `${model.title} (HLSL)` })
+    setRenderer('threejs')
+    setShaderLang('hlsl')
     setMode('model')
   }
 
@@ -96,7 +120,12 @@ function ModelCard({ model, isUserPost, onDelete }) {
               <button className="card-del" title="Unpublish"
                 onClick={() => onDelete?.(model.id)}>×</button>
             )}
-            <button className="card-load" onClick={loadModel}>Load →</button>
+            <button className="card-load card-load-glsl" onClick={loadGlsl}
+              title="Load GLSL — runs in the 3D preview">↓ GLSL</button>
+            {hasHlsl && (
+              <button className="card-load card-load-hlsl" onClick={loadHlsl}
+                title="Load HLSL — opens the shader code, ready for Unity / Unreal">↓ HLSL</button>
+            )}
           </div>
         </div>
       </div>
