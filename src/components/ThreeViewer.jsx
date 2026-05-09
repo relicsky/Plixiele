@@ -142,6 +142,7 @@ export default function ThreeViewer({ modelData, isGenerating }) {
   const [publishOpen, setPublishOpen] = useState(false)
   const [justPublished, setJustPublished] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [shareLabel, setShareLabel] = useState(null)
 
   function downloadPNG() {
     if (!threeCtx) return
@@ -158,6 +159,27 @@ export default function ThreeViewer({ modelData, isGenerating }) {
     try { await downloadModelGLB(modelData, 'plixie-model.glb') }
     catch (e) { console.error('GLB export failed', e) }
     finally { setExporting(false) }
+  }
+
+  async function shareModel() {
+    if (!modelData) return
+    const text = `${modelData.description || 'A 3D model made with Plixiele'}`
+    const url = window.location.origin
+    const payload = { title: 'Plixiele 3D model', text, url }
+    try {
+      if (navigator.share) {
+        await navigator.share(payload)
+        setShareLabel('Shared')
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(`${text}\n${url}`)
+        setShareLabel('Copied')
+      } else {
+        setShareLabel('Unsupported')
+      }
+    } catch (e) {
+      if (e?.name !== 'AbortError') setShareLabel('Failed')
+    }
+    setTimeout(() => setShareLabel(null), 1800)
   }
 
   function downloadHLSL() {
@@ -193,6 +215,9 @@ export default function ThreeViewer({ modelData, isGenerating }) {
                 ↓ HLSL
               </button>
             )}
+            <button className="viewer-btn" onClick={shareModel} disabled={!!shareLabel}>
+              {shareLabel ? `✓ ${shareLabel}` : '↗ Share'}
+            </button>
             <button className="viewer-btn" onClick={() => setPublishOpen(true)} disabled={justPublished}>
               {justPublished ? '✓ Published' : '⇧ Publish'}
             </button>
