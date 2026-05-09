@@ -27,7 +27,26 @@ Respond with ONLY a JSON code block. No prose.
 - If the user prompt does not match the library well, still pick the closest matches and arrange them as if it does.
 - "background" is an optional CSS color string for the scene background.
 
+{{TERRAIN_BLOCK}}
+
 ## Available library
 
 {{LIBRARY}}
 `
+
+export const TERRAIN_BLOCK_ON = `## Terrain mode is ON
+
+There is procedural rolling terrain on the XZ plane spanning roughly -12 to 12 in both axes. The surface height at any (x, z) follows a smooth multi-frequency wave pattern with peaks around y=1.7 and valleys around y=-1.7. The host application will snap each item's Y to the surface automatically — you only need to choose good (x, z) positions.
+
+Lay items out as if you were composing a real scene on uneven ground:
+- Cluster related items (a "village" of small models, a "grove" of tall ones).
+- Leave open clearings — don't blanket the whole terrain.
+- Vary spacing: some items close together, some isolated.
+- Place hero/centerpiece items near (0, 0); supporting items radiate outward.
+- A "cool" composition has rhythm and focal points, not a uniform grid.
+
+Use this freedom to build something that looks deliberately designed.`
+
+export const TERRAIN_BLOCK_OFF = `## Terrain mode is OFF
+
+There is no ground plane — items float in space against the background. Use Y freely for vertical layering.`

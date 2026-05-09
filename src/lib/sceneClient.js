@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { SCENE_PROMPT } from './scenePrompt.js'
+import { SCENE_PROMPT, TERRAIN_BLOCK_ON, TERRAIN_BLOCK_OFF } from './scenePrompt.js'
 
 let _client = null
 function client() {
@@ -15,9 +15,11 @@ function libraryText(library) {
   return library.map(m => `- ${m.id} — ${m.description || m.title || '(no description)'}`).join('\n')
 }
 
-export async function generateScene(userPrompt, library, { onStatus } = {}) {
+export async function generateScene(userPrompt, library, { onStatus, terrain = false } = {}) {
   onStatus?.('loading')
-  const system = SCENE_PROMPT.replace('{{LIBRARY}}', libraryText(library))
+  const system = SCENE_PROMPT
+    .replace('{{LIBRARY}}', libraryText(library))
+    .replace('{{TERRAIN_BLOCK}}', terrain ? TERRAIN_BLOCK_ON : TERRAIN_BLOCK_OFF)
   let text = ''
   const stream = client().messages.stream({
     model: 'claude-opus-4-7',

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, Suspense } from 'react'
+import { useState, useMemo, useRef, useEffect, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
 import * as THREE from 'three'
@@ -6,6 +6,29 @@ import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import { generateScene } from '../lib/sceneClient.js'
 import { downloadSceneGLB } from '../lib/exportGLB.js'
+
+const TERRAIN_SIZE = 24
+const TERRAIN_SEG = 60
+
+function terrainHeight(x, z) {
+  return Math.sin(x * 0.45) * 0.55
+       + Math.cos(z * 0.38) * 0.6
+       + Math.sin((x + z) * 0.22) * 0.35
+       + Math.cos(x * 0.13 - z * 0.17) * 0.3
+}
+
+function buildTerrainGeometry() {
+  const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEG, TERRAIN_SEG)
+  geo.rotateX(-Math.PI / 2)
+  const pos = geo.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i)
+    pos.setY(i, terrainHeight(x, z))
+  }
+  pos.needsUpdate = true
+  geo.computeVertexNormals()
+  return geo
+}
 
 const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
 void main(){vUv=uv;vNormal=normalize(normalMatrix*normal);vPosition=position;vWorldPosition=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`
@@ -86,7 +109,28 @@ function SceneItem({ item, selected, onSelect }) {
   )
 }
 
-function SceneCanvas({ items, background, selectedId, onSelect }) {
+function Terrain() {
+  const geo = useMemo(() => buildTerrainGeometry(), [])
+  return (
+    <mesh geometry={geo} receiveShadow>
+      <meshStandardMaterial
+        color="#1a3a2a" roughness={0.95} metalness={0}
+        flatShading
+      />
+    </mesh>
+  )
+}
+
+function ContextBridge({ onReady }) {
+  const { gl, scene, camera } = useThree()
+  useEffect(() => {
+    onReady({ gl, scene, camera })
+    return () => onReady(null)
+  }, [gl, scene, camera])
+  return null
+}
+
+function SceneCanvas({ items, background, selectedId, onSelect, terrain, onCtx }) {
   return (
     <Canvas camera={{ position: [8, 6, 10], fov: 48 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
@@ -95,13 +139,17 @@ function SceneCanvas({ items, background, selectedId, onSelect }) {
       <ambientLight intensity={1.4} />
       <pointLight position={[8, 10, 8]} intensity={3} />
       <pointLight position={[-6, -3, -6]} intensity={1.4} color="#5060ff" />
-      <Grid args={[30, 30]} cellColor="#222" sectionColor="#444" sectionThickness={1} fadeDistance={40} infiniteGrid />
+      {terrain
+        ? <Terrain />
+        : <Grid args={[30, 30]} cellColor="#222" sectionColor="#444" sectionThickness={1} fadeDistance={40} infiniteGrid />
+      }
       <Suspense fallback={null}>
         {items.map(it => (
           <SceneItem key={it.id} item={it} selected={selectedId === it.id} onSelect={onSelect} />
         ))}
       </Suspense>
       <OrbitControls enableDamping dampingFactor={0.06} />
+      <ContextBridge onReady={onCtx} />
     </Canvas>
   )
 }
@@ -143,10 +191,13 @@ export default function SceneBuilder() {
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [downloading, setDownloading] = useState(false)
+  const [showDl, setShowDl] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [librarySearch, setLibrarySearch] = useState('')
   const [showLibrary, setShowLibrary] = useState(true)
   const [showSaved, setShowSaved] = useState(true)
+  const [terrain, setTerrain] = useState(false)
+  const [threeCtx, setThreeCtx] = useState(null)
 
   const sessionLib = useMemo(
     () => sessions
@@ -206,15 +257,23 @@ export default function SceneBuilder() {
 
   const selected = items.find(i => i.id === selectedId) || null
 
+  function snapToTerrain(pos, scale = [1, 1, 1]) {
+    if (!terrain) return pos
+    const [x, , z] = pos
+    const sy = Array.isArray(scale) ? scale[1] : scale
+    return [x, terrainHeight(x, z) + 0.5 * sy, z]
+  }
+
   function addFromLib(libId) {
     const lib = libById[libId]
     if (!lib) return
+    const basePos = spreadPosition(items.length)
     const next = {
       id: newId(),
       ref: libId,
       label: lib.title,
       modelData: lib.modelData,
-      position: spreadPosition(items.length),
+      position: snapToTerrain(basePos),
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
     }
@@ -299,7 +358,7 @@ export default function SceneBuilder() {
     setBusy(true)
     setError('')
     try {
-      const data = await generateScene(prompt, fullLib)
+      const data = await generateScene(prompt, fullLib, { terrain })
       const next = (data.items || []).map((it, i) => {
         const lib = libById[it.ref]
         if (!lib) return null
@@ -308,12 +367,13 @@ export default function SceneBuilder() {
           : typeof it.scale === 'number'
             ? [it.scale, it.scale, it.scale]
             : [1, 1, 1]
+        const rawPos = it.position || spreadPosition(i)
         return {
           id: newId(),
           ref: it.ref,
           label: lib.title,
           modelData: lib.modelData,
-          position: it.position || spreadPosition(i),
+          position: terrain ? snapToTerrain(rawPos, scaleArr) : rawPos,
           rotation: it.rotation || [0, 0, 0],
           scale: scaleArr,
         }
@@ -329,11 +389,12 @@ export default function SceneBuilder() {
     }
   }
 
-  async function runDownload() {
+  async function runDownloadGLB() {
     if (items.length === 0) return
+    setShowDl(false)
     setDownloading(true)
     try {
-      await downloadSceneGLB(items, 'plixie-scene.glb', prompt.slice(0, 40) || 'plixie-scene')
+      await downloadSceneGLB(items, 'plixie-scene.glb', sceneTitle || 'plixie-scene')
     } catch (e) {
       setError(e.message || 'GLB export failed')
     } finally {
@@ -341,11 +402,32 @@ export default function SceneBuilder() {
     }
   }
 
+  function runDownloadPNG() {
+    setShowDl(false)
+    if (!threeCtx) return
+    threeCtx.gl.render(threeCtx.scene, threeCtx.camera)
+    const a = document.createElement('a')
+    a.download = (sceneTitle || 'plixie-scene') + '.png'
+    a.href = threeCtx.gl.domElement.toDataURL('image/png')
+    a.click()
+  }
+
+  function toggleTerrain() {
+    const next = !terrain
+    setTerrain(next)
+    if (next) {
+      setItems(prev => prev.map(it => ({
+        ...it,
+        position: [it.position[0], terrainHeight(it.position[0], it.position[2]) + 0.5 * it.scale[1], it.position[2]],
+      })))
+    }
+  }
+
   const isDirty = items.length > 0
   const sceneStatus = activeSceneId ? (savedFlash ? 'Saved ✓' : 'Editing saved scene') : (isDirty ? 'Unsaved' : 'Empty')
 
   return (
-    <div className="scene-builder">
+    <div className="scene-builder" onClick={() => showDl && setShowDl(false)}>
       <div className="scene-sidebar">
         <div className="scene-titlebar">
           <input
@@ -363,10 +445,45 @@ export default function SceneBuilder() {
           <button className="scene-icon-btn" onClick={newScene} title="New scene">＋ New</button>
           <button className="scene-icon-btn" onClick={saveCurrentScene}
             disabled={items.length === 0} title="Save scene">⌘ Save</button>
-          <button className="scene-icon-btn primary" onClick={runDownload}
-            disabled={items.length === 0 || downloading} title="Download GLB">
-            {downloading ? '…' : '↓ GLB'}
+          <div className="scene-dl-wrap" onClick={e => e.stopPropagation()}>
+            <button className="scene-icon-btn primary"
+              onClick={() => setShowDl(d => !d)}
+              disabled={items.length === 0 || downloading}
+              title="Download">
+              {downloading ? '…' : '↓ Download'}
+            </button>
+            {showDl && (
+              <div className="dl-dropdown scene-dl-dropdown">
+                <div className="dl-row">
+                  <span className="dl-icon">📷</span>
+                  <div className="dl-info">
+                    <span className="dl-name">PNG</span>
+                    <span className="dl-desc">Screenshot of current view</span>
+                  </div>
+                  <button className="dl-go" onClick={runDownloadPNG} title="Download PNG">↓</button>
+                </div>
+                <div className="dl-row">
+                  <span className="dl-icon">📦</span>
+                  <div className="dl-info">
+                    <span className="dl-name">GLB</span>
+                    <span className="dl-desc">3D scene for Blender, Unity, etc.</span>
+                  </div>
+                  <button className="dl-go" onClick={runDownloadGLB} title="Download GLB">↓</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="scene-toggle-row">
+          <button className={`scene-toggle${terrain ? ' on' : ''}`} onClick={toggleTerrain}>
+            <span className="scene-toggle-track">
+              <span className="scene-toggle-thumb" />
+            </span>
+            <span className="scene-toggle-label">⛰ Terrain</span>
+            <span className="scene-toggle-state">{terrain ? 'ON' : 'OFF'}</span>
           </button>
+          {terrain && <p className="scene-toggle-note">Items will rest on the surface. AI placement adapts to the heightmap.</p>}
         </div>
 
         <div className="scene-section">
@@ -500,7 +617,8 @@ export default function SceneBuilder() {
           </div>
         ) : (
           <SceneCanvas items={items} background={background}
-            selectedId={selectedId} onSelect={setSelectedId} />
+            selectedId={selectedId} onSelect={setSelectedId}
+            terrain={terrain} onCtx={setThreeCtx} />
         )}
       </div>
     </div>

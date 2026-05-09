@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import SceneBuilder from './SceneBuilder.jsx'
+import LabsHome from './LabsHome.jsx'
 
 // ── shader re-use helper ──
 const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -129,19 +130,26 @@ function UniformControl({ name, def, onChange }) {
 }
 
 // ── Main Labs component ──
+const FEATURE_TITLES = { scene: 'Scene Builder', shader: 'Shader Lab' }
+
 export default function LabsTab() {
-  const [labTab, setLabTab] = useState('scene')
+  const [active, setActive] = useState(null)
+
+  if (!active) {
+    return (
+      <div className="labs-shell">
+        <LabsHome onPick={setActive} />
+      </div>
+    )
+  }
+
   return (
     <div className="labs-shell">
-      <div className="labs-tabbar">
-        <button className={`labs-tabbar-btn${labTab === 'scene' ? ' active' : ''}`} onClick={() => setLabTab('scene')}>
-          ⊞ Scene Builder
-        </button>
-        <button className={`labs-tabbar-btn${labTab === 'shader' ? ' active' : ''}`} onClick={() => setLabTab('shader')}>
-          ⚗ Shader Lab
-        </button>
+      <div className="labs-topbar">
+        <button className="labs-back" onClick={() => setActive(null)}>← Back to Labs</button>
+        <span className="labs-crumb">{FEATURE_TITLES[active]}</span>
       </div>
-      {labTab === 'scene' ? <SceneBuilder /> : <ShaderLab />}
+      {active === 'scene' ? <SceneBuilder /> : <ShaderLab />}
     </div>
   )
 }

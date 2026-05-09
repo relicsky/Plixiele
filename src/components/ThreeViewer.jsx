@@ -175,8 +175,22 @@ export default function ThreeViewer({ modelData, isGenerating }) {
               </button>
               {showDl && (
                 <div className="dl-dropdown">
-                  <button onClick={downloadPNG}>📷 PNG Screenshot</button>
-                  <button onClick={downloadGLB}>📦 GLB (3D Model)</button>
+                  <div className="dl-row">
+                    <span className="dl-icon">📷</span>
+                    <div className="dl-info">
+                      <span className="dl-name">PNG</span>
+                      <span className="dl-desc">Screenshot of the current view</span>
+                    </div>
+                    <button className="dl-go" onClick={downloadPNG} title="Download PNG">↓</button>
+                  </div>
+                  <div className="dl-row">
+                    <span className="dl-icon">📦</span>
+                    <div className="dl-info">
+                      <span className="dl-name">GLB</span>
+                      <span className="dl-desc">3D model for Blender, Unity, etc.</span>
+                    </div>
+                    <button className="dl-go" onClick={downloadGLB} title="Download GLB">↓</button>
+                  </div>
                 </div>
               )}
             </div>
