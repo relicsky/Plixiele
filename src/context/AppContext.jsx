@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import * as S from '../lib/storage.js'
 import { signOutUser, onAuthChange, isFirebaseReady } from '../lib/firebaseAuth.js'
 import * as F from '../lib/firestoreStore.js'
+import { db } from '../lib/firebase.js'
+import { doc, onSnapshot } from 'firebase/firestore'
 
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
@@ -18,11 +20,14 @@ export function AppProvider({ children }) {
   const [renderer, setRenderer] = useState('threejs')
   const [shaderLang, setShaderLang] = useState('glsl')
   const [plan, setPlanState] = useState(() => localStorage.getItem('plixie_plan') || 'free')
+  const [credits, setCredits] = useState(0)
   const [aiBrain, setAiBrainState] = useState(() =>
     localStorage.getItem('plixie_brain') || defaultBrainForPlan(localStorage.getItem('plixie_plan') || 'free'),
   )
   const setAiBrain = (b) => { localStorage.setItem('plixie_brain', b); setAiBrainState(b) }
-  const setPlan    = (p) => { localStorage.setItem('plixie_plan', p);   setPlanState(p) }
+  // Local-only override for dev. In production, plan comes from the Firestore
+  // profile doc (managed server-side via the Stripe webhook).
+  const setPlan = (p) => { localStorage.setItem('plixie_plan', p); setPlanState(p) }
   const [sessions, setSessions] = useState(() => S.getSessions())
   const [activeId, setActiveId] = useState({ model: null, image: null, code: null })
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
@@ -70,6 +75,21 @@ export function AppProvider({ children }) {
     }
     return F.watchCommunity(setCommunityPosts)
   }, [])
+
+  // Subscribe to the user's profile doc (plan, credits) once authenticated.
+  useEffect(() => {
+    if (!cloudUid || !db) return
+    const unsub = onSnapshot(doc(db, 'users', cloudUid), (snap) => {
+      const data = snap.data()
+      if (!data) return
+      if (data.plan) {
+        setPlanState(data.plan)
+        localStorage.setItem('plixie_plan', data.plan)
+      }
+      if (typeof data.credits === 'number') setCredits(data.credits)
+    })
+    return unsub
+  }, [cloudUid])
 
   async function handleSignOut() {
     try {
@@ -210,6 +230,7 @@ export function AppProvider({ children }) {
       shaderLang, setShaderLang,
       aiBrain, setAiBrain,
       plan, setPlan,
+      credits,
       sessions, activeSession, activeId,
       createSession, updateSession, removeSession, loadSession,
       communityPosts, publishToCommunity, unpublishCommunity,

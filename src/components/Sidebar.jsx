@@ -23,8 +23,8 @@ function initials(name = '') {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function Sidebar({ onClose }) {
-  const { user, signOut, mode, setMode, sessions, activeId, createSession, removeSession, loadSession } = useApp()
+export default function Sidebar({ onClose, onOpenPricing, onOpenLegal }) {
+  const { user, signOut, mode, setMode, sessions, activeId, createSession, removeSession, loadSession, plan, credits } = useApp()
   const modeSessions = sessions.filter(s => s.mode === mode)
 
   return (
@@ -74,6 +74,24 @@ export default function Sidebar({ onClose }) {
           </>
         )}
       </div>
+
+      {onOpenPricing && (
+        <button className="sidebar-plan" onClick={onOpenPricing} title="Manage plan">
+          <span className="sidebar-plan-tier">{plan}</span>
+          <span className="sidebar-plan-credits">{credits} credits</span>
+          <span className="sidebar-plan-arrow">↗</span>
+        </button>
+      )}
+
+      {onOpenLegal && (
+        <div className="sidebar-legal">
+          <button onClick={() => onOpenLegal('terms')}>Terms</button>
+          <span>·</span>
+          <button onClick={() => onOpenLegal('privacy')}>Privacy</button>
+          <span>·</span>
+          <button onClick={() => onOpenLegal('conduct')}>Conduct</button>
+        </div>
+      )}
 
       <div className="sidebar-user">
         <div className="user-avatar">{initials(user?.name)}</div>
