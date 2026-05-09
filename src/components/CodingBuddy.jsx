@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import { streamCodingReply } from '../lib/codingClient.js'
+import AiBrainToggle from './AiBrainToggle.jsx'
 import { IconSend } from './Icons.jsx'
 
 const EXAMPLES = [
@@ -66,7 +67,7 @@ function InlineText({ text }) {
 }
 
 export default function CodingBuddy() {
-  const { activeSession, createSession, updateSession } = useApp()
+  const { activeSession, createSession, updateSession, aiBrain, plan } = useApp()
   const sess = activeSession.code
   const [messages, setMessages] = useState(sess?.messages || [])
   const [streamText, setStreamText] = useState('')
@@ -111,7 +112,10 @@ export default function CodingBuddy() {
     const apiMessages = newMsgs.map(m => ({ role: m.role, content: m.content }))
 
     try {
+      const variant = plan === 'free' ? 'flash' : 'pro'
       await streamCodingReply(apiMessages, {
+        brain: aiBrain,
+        variant,
         onChunk: (full) => setStreamText(full),
         onDone: (full) => {
           const aMsg = { role: 'assistant', content: full, ts: Date.now() }
@@ -184,6 +188,7 @@ export default function CodingBuddy() {
         <div ref={endRef} />
       </div>
 
+      <AiBrainToggle />
       <div className="code-input-wrap">
         <textarea
           ref={taRef}
