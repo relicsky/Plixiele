@@ -24,6 +24,13 @@ const PLAN_CREDITS = {
 }
 const COST = { gen: 10, chat: 2 }
 
+// Dev / staff allowlist — these emails are auto-upgraded to Premium with
+// full credits regardless of subscription status. Add yourself here.
+const DEV_EMAILS = new Set([
+  'thesaberkid@outlook.com',
+  'mhwetmore@gmail.com',
+])
+
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -49,22 +56,44 @@ async function requireUser(req, res) {
   catch (e) { res.status(401).json({ error: 'Invalid token: ' + e.message }); return null }
 }
 
+function planForEmail(email) {
+  return email && DEV_EMAILS.has(email.toLowerCase()) ? 'premium' : 'free'
+}
+
 async function ensureProfile(uid, email) {
   const ref = db.doc(`users/${uid}`)
   const snap = await ref.get()
+  const seedPlan = planForEmail(email)
+  const seedCredits = PLAN_CREDITS[seedPlan]
+
   if (!snap.exists) {
     await ref.set({
       email: email || null,
-      plan: 'free',
-      credits: PLAN_CREDITS.free,
+      plan: seedPlan,
+      credits: seedCredits,
       creditsResetAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true })
-    return { plan: 'free', credits: PLAN_CREDITS.free }
+    return { plan: seedPlan, credits: seedCredits }
   }
+
   const data = snap.data()
-  return { plan: data.plan || 'free', credits: data.credits ?? 0 }
+  // Existing doc that pre-dates the credits system: backfill missing fields
+  // and apply the dev plan if the user is in the allowlist.
+  const patch = {}
+  if (typeof data.credits !== 'number') patch.credits = seedCredits
+  if (!data.plan) patch.plan = seedPlan
+  if (seedPlan === 'premium' && data.plan !== 'premium') {
+    patch.plan = 'premium'
+    patch.credits = PLAN_CREDITS.premium
+  }
+  if (Object.keys(patch).length > 0) {
+    patch.updatedAt = FieldValue.serverTimestamp()
+    await ref.set(patch, { merge: true })
+    return { plan: patch.plan || data.plan, credits: patch.credits ?? data.credits }
+  }
+  return { plan: data.plan || seedPlan, credits: data.credits ?? seedCredits }
 }
 
 function intentFromBody(body) {
@@ -135,6 +164,25 @@ async function gateAndProxy({ req, res, providerName, callUpstream }) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// ── Bootstrap: client calls this on sign-in to seed missing fields ──
+export const bootstrapProfile = onRequest(
+  { region: 'us-central1', cors: false, timeoutSeconds: 30, memory: '256MiB' },
+  async (req, res) => {
+    setCors(req, res)
+    if (req.method === 'OPTIONS') { res.status(204).end(); return }
+    if (req.method !== 'POST')   { res.status(405).end(); return }
+    const user = await requireUser(req, res)
+    if (!user) return
+    try {
+      const profile = await ensureProfile(user.uid, user.email)
+      res.json(profile)
+    } catch (e) {
+      console.error('bootstrapProfile failed', e)
+      res.status(500).json({ error: e.message })
+    }
+  },
+)
 
 // ── Anthropic proxy ──
 export const anthropicProxy = onRequest(

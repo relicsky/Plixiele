@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import * as S from '../lib/storage.js'
 import { signOutUser, onAuthChange, isFirebaseReady } from '../lib/firebaseAuth.js'
 import * as F from '../lib/firestoreStore.js'
-import { db } from '../lib/firebase.js'
+import { db, auth } from '../lib/firebase.js'
 import { doc, onSnapshot } from 'firebase/firestore'
 
 const Ctx = createContext(null)
@@ -24,7 +24,9 @@ export function AppProvider({ children }) {
   const [aiBrain, setAiBrainState] = useState(() =>
     localStorage.getItem('plixie_brain') || defaultBrainForPlan(localStorage.getItem('plixie_plan') || 'free'),
   )
+  const [aiVariant, setAiVariantState] = useState(() => localStorage.getItem('plixie_variant') || '')
   const setAiBrain = (b) => { localStorage.setItem('plixie_brain', b); setAiBrainState(b) }
+  const setAiVariant = (v) => { localStorage.setItem('plixie_variant', v || ''); setAiVariantState(v || '') }
   // Local-only override for dev. In production, plan comes from the Firestore
   // profile doc (managed server-side via the Stripe webhook).
   const setPlan = (p) => { localStorage.setItem('plixie_plan', p); setPlanState(p) }
@@ -76,9 +78,24 @@ export function AppProvider({ children }) {
     return F.watchCommunity(setCommunityPosts)
   }, [])
 
-  // Subscribe to the user's profile doc (plan, credits) once authenticated.
+  // Subscribe to the user's profile doc (plan, credits) once authenticated,
+  // and bootstrap missing fields via the server (so the dev allowlist runs
+  // and existing accounts pick up plan + credits).
   useEffect(() => {
     if (!cloudUid || !db) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken?.()
+        if (!token || cancelled) return
+        await fetch('/api/bootstrap', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }).catch(() => {/* ignore — onSnapshot will still try */})
+      } catch { /* ignore */ }
+    })()
+
     const unsub = onSnapshot(doc(db, 'users', cloudUid), (snap) => {
       const data = snap.data()
       if (!data) return
@@ -88,7 +105,7 @@ export function AppProvider({ children }) {
       }
       if (typeof data.credits === 'number') setCredits(data.credits)
     })
-    return unsub
+    return () => { cancelled = true; unsub() }
   }, [cloudUid])
 
   async function handleSignOut() {
@@ -229,6 +246,7 @@ export function AppProvider({ children }) {
       renderer, setRenderer,
       shaderLang, setShaderLang,
       aiBrain, setAiBrain,
+      aiVariant, setAiVariant,
       plan, setPlan,
       credits,
       sessions, activeSession, activeId,

@@ -6,8 +6,9 @@
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/api/anthropic", "function": "anthropicProxy", "region": "us-central1" },
-      { "source": "/api/gemini",    "function": "geminiProxy",    "region": "us-central1" },
+      { "source": "/api/anthropic", "function": "anthropicProxy",   "region": "us-central1" },
+      { "source": "/api/gemini",    "function": "geminiProxy",      "region": "us-central1" },
+      { "source": "/api/bootstrap", "function": "bootstrapProfile", "region": "us-central1" },
       { "source": "**", "destination": "/index.html" }
     ]
   },

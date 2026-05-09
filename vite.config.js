@@ -18,6 +18,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '',
       },
+      '/api/bootstrap': {
+        target: `${FN_BASE}/bootstrapProfile`,
+        changeOrigin: true,
+        rewrite: () => '',
+      },
     },
   },
 })

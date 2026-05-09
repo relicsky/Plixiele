@@ -67,7 +67,7 @@ function InlineText({ text }) {
 }
 
 export default function CodingBuddy() {
-  const { activeSession, createSession, updateSession, aiBrain, plan } = useApp()
+  const { activeSession, createSession, updateSession, aiBrain, aiVariant, plan } = useApp()
   const sess = activeSession.code
   const [messages, setMessages] = useState(sess?.messages || [])
   const [streamText, setStreamText] = useState('')
@@ -112,9 +112,9 @@ export default function CodingBuddy() {
     const apiMessages = newMsgs.map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const variant = aiBrain === 'gemini'
+      const variant = aiVariant || (aiBrain === 'gemini'
         ? (plan === 'free' ? 'flash' : 'pro')
-        : (plan === 'premium' ? 'premium' : 'pro')
+        : (plan === 'premium' ? 'premium' : 'pro'))
       await streamCodingReply(apiMessages, {
         brain: aiBrain,
         variant,

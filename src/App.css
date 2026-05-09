@@ -556,6 +556,17 @@
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .07em; color: var(--text-3);
 }
+.brain-select {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: var(--r-sm);
+  cursor: pointer; outline: none;
+  transition: border-color .12s, background .12s;
+}
+.brain-select:hover  { background: var(--surface-hover); border-color: var(--border-bright); }
+.brain-select:focus  { border-color: var(--accent); }
+.brain-select option { background: var(--bg2); color: var(--text); }
+.brain-select option:disabled { color: var(--text-3); }
 
 .chat-col-header {
   padding: 10px 12px;

@@ -2,26 +2,53 @@ import { useApp } from '../context/AppContext.jsx'
 
 const PRO_PLUS = new Set(['pro', 'premium'])
 
+// Each option: { value, label, brain, variant, minPlan }.
+// `value` is what we persist in localStorage. brain+variant are forwarded
+// to the AI client. minPlan controls visibility/disabled state.
+const OPTIONS = [
+  { value: 'gemini-flash', label: 'Gemini Flash', brain: 'gemini', variant: 'flash',   minPlan: 'free'    },
+  { value: 'gemini-pro',   label: 'Gemini Pro',   brain: 'gemini', variant: 'pro',     minPlan: 'basic'   },
+  { value: 'claude-sonnet',label: 'Claude Sonnet',brain: 'claude', variant: 'pro',     minPlan: 'pro'     },
+  { value: 'claude-opus',  label: 'Claude Opus',  brain: 'claude', variant: 'premium', minPlan: 'premium' },
+]
+
+const PLAN_RANK = { free: 0, basic: 1, pro: 2, premium: 3 }
+
+function valueFor(brain, variant) {
+  return OPTIONS.find(o => o.brain === brain && o.variant === variant)?.value || 'gemini-flash'
+}
+
 export default function AiBrainToggle() {
-  const { aiBrain, setAiBrain, plan } = useApp()
+  const { aiBrain, setAiBrain, aiVariant, setAiVariant, plan } = useApp()
   if (!PRO_PLUS.has(plan)) return null
+
+  const explicit = aiVariant && OPTIONS.find(o => o.brain === aiBrain && o.variant === aiVariant)
+  const current = explicit
+    ? explicit.value
+    : aiBrain === 'claude'
+      ? (plan === 'premium' ? 'claude-opus' : 'claude-sonnet')
+      : (plan === 'free'    ? 'gemini-flash' : 'gemini-pro')
+
+  function onChange(e) {
+    const opt = OPTIONS.find(o => o.value === e.target.value)
+    if (!opt) return
+    setAiBrain(opt.brain)
+    setAiVariant(opt.variant)
+  }
+
   return (
     <div className="brain-row">
       <span className="brain-row-label">AI</span>
-      <div className="shader-toggle brain-toggle" role="group" aria-label="AI model">
-        <button
-          className={`shader-toggle-opt${aiBrain === 'claude' ? ' active' : ''}`}
-          onClick={() => setAiBrain('claude')}
-          title="Claude Opus — premium quality, slower, higher cost">
-          Claude
-        </button>
-        <button
-          className={`shader-toggle-opt${aiBrain === 'gemini' ? ' active' : ''}`}
-          onClick={() => setAiBrain('gemini')}
-          title="Gemini Flash — fast, cheaper, good for quick iterations">
-          Gemini
-        </button>
-      </div>
+      <select className="brain-select" value={current} onChange={onChange}>
+        {OPTIONS.map((o) => {
+          const allowed = PLAN_RANK[plan] >= PLAN_RANK[o.minPlan]
+          return (
+            <option key={o.value} value={o.value} disabled={!allowed}>
+              {o.label}{!allowed ? ' (locked)' : ''}
+            </option>
+          )
+        })}
+      </select>
     </div>
   )
 }
