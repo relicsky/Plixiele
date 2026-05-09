@@ -1,16 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const FN_BASE = 'http://127.0.0.1:5001/plixiele-sign-in/us-central1'
+
 export default defineConfig({
   plugins: [react()],
   define: { 'process.env': {} },
   server: {
     proxy: {
-      '/anthropic-api': {
-        target: 'https://api.anthropic.com',
+      '/api/anthropic': {
+        target: `${FN_BASE}/anthropicProxy`,
         changeOrigin: true,
-        secure: true,
-        rewrite: path => path.replace(/^\/anthropic-api/, ''),
+        rewrite: () => '',
+      },
+      '/api/gemini': {
+        target: `${FN_BASE}/geminiProxy`,
+        changeOrigin: true,
+        rewrite: () => '',
       },
     },
   },

@@ -1,14 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { SCENE_PROMPT, TERRAIN_BLOCK_ON, TERRAIN_BLOCK_OFF } from './scenePrompt.js'
+import { auth } from './firebase.js'
 
-let _client = null
-function client() {
-  if (_client) return _client
-  const key = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!key) throw new Error('VITE_ANTHROPIC_API_KEY not set in .env')
-  const baseURL = `${window.location.origin}/anthropic-api`
-  _client = new Anthropic({ apiKey: key, baseURL, dangerouslyAllowBrowser: true })
-  return _client
+async function getIdToken() {
+  const user = auth?.currentUser
+  if (!user) throw new Error('Sign in to generate scenes')
+  return user.getIdToken()
 }
 
 function libraryText(library) {
@@ -20,16 +16,50 @@ export async function generateScene(userPrompt, library, { onStatus, terrain = f
   const system = SCENE_PROMPT
     .replace('{{LIBRARY}}', libraryText(library))
     .replace('{{TERRAIN_BLOCK}}', terrain ? TERRAIN_BLOCK_ON : TERRAIN_BLOCK_OFF)
-  let text = ''
-  const stream = client().messages.stream({
-    model: 'claude-opus-4-7',
-    max_tokens: 4000,
-    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Build a scene: ${userPrompt}` }],
+
+  const token = await getIdToken()
+  const res = await fetch('/api/anthropic', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-7',
+      max_tokens: 8000,
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: `Build a scene: ${userPrompt}` }],
+    }),
   })
-  for await (const ev of stream) {
-    if (ev.type === 'content_block_start' && ev.content_block.type === 'text') onStatus?.('writing')
-    if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') text += ev.delta.text
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Scene gen ${res.status}: ${err.slice(0, 320)}`)
+  }
+
+  let text = ''
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let firstChunk = true
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let idx
+    while ((idx = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, idx).trim()
+      buffer = buffer.slice(idx + 1)
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (!payload) continue
+      try {
+        const obj = JSON.parse(payload)
+        if (obj.type === 'content_block_delta' && obj.delta?.type === 'text_delta') {
+          if (firstChunk) { onStatus?.('writing'); firstChunk = false }
+          text += obj.delta.text
+        }
+      } catch { /* skip */ }
+    }
   }
   return parseJSON(text)
 }

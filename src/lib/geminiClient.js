@@ -2,21 +2,7 @@ import { SYSTEM_PROMPT } from './systemPrompt.js'
 import { BABYLON_PROMPT } from './babylonPrompt.js'
 import { BLENDER_PROMPT } from './blenderPrompt.js'
 import { HLSL_PROMPT } from './hlslPrompt.js'
-
-const MODELS = {
-  flash: 'gemini-2.5-flash',
-  pro:   'gemini-2.5-pro',
-}
-function endpointFor(variant) {
-  const id = MODELS[variant] || MODELS.flash
-  return `https://generativelanguage.googleapis.com/v1beta/models/${id}:streamGenerateContent`
-}
-
-function key() {
-  const k = import.meta.env.VITE_GEMINI_API_KEY
-  if (!k) throw new Error('VITE_GEMINI_API_KEY not set in .env')
-  return k
-}
+import { auth } from './firebase.js'
 
 function promptFor(renderer) {
   if (renderer === 'babylon') return BABYLON_PROMPT
@@ -25,26 +11,37 @@ function promptFor(renderer) {
   return SYSTEM_PROMPT
 }
 
+async function getIdToken() {
+  const user = auth?.currentUser
+  if (!user) throw new Error('Sign in to generate models')
+  return user.getIdToken()
+}
+
 async function callGemini(systemText, userParts, onStatus, variant = 'flash') {
   onStatus?.('loading')
-  const url = `${endpointFor(variant)}?alt=sse&key=${key()}`
+  const token = await getIdToken()
   const body = {
+    _variant: variant,
     systemInstruction: { parts: [{ text: systemText }] },
     contents: [{ role: 'user', parts: userParts }],
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: 60000,
-      // Gemini 2.5 uses "thinking" by default which consumes the output budget.
-      // For structured JSON generation we want all tokens going to actual output.
       thinkingConfig: { thinkingBudget: 0 },
     },
   }
-  const res = await fetch(url, {
+  const res = await fetch('/api/gemini', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 240)}`)
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Gemini ${res.status}: ${err.slice(0, 320)}`)
+  }
 
   let text = ''
   const reader = res.body.getReader()
@@ -69,7 +66,7 @@ async function callGemini(systemText, userParts, onStatus, variant = 'flash') {
           if (firstChunk) { onStatus?.('writing'); firstChunk = false }
           text += chunk
         }
-      } catch { /* skip non-JSON keepalives */ }
+      } catch { /* skip keepalives */ }
     }
   }
   return text
@@ -97,7 +94,7 @@ export async function generate3DFromImage(base64, mimeType, userPrompt, renderer
   return data
 }
 
-// JSON extraction (mirrors claudeClient)
+// JSON extraction
 function sanitizeJSON(s) {
   let out = '', inStr = false, esc = false
   for (let i = 0; i < s.length; i++) {

@@ -1,22 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { SYSTEM_PROMPT } from './systemPrompt.js'
 import { BABYLON_PROMPT } from './babylonPrompt.js'
 import { BLENDER_PROMPT } from './blenderPrompt.js'
 import { HLSL_PROMPT } from './hlslPrompt.js'
+import { auth } from './firebase.js'
 
-let _client = null
-
-function client() {
-  if (_client) return _client
-  const key = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!key) throw new Error('VITE_ANTHROPIC_API_KEY not set in .env')
-  // Route through Vite dev proxy to avoid CORS
-  const baseURL = `${window.location.origin}/anthropic-api`
-  _client = new Anthropic({ apiKey: key, baseURL, dangerouslyAllowBrowser: true })
-  return _client
-}
-
-// Pick system prompt by renderer
 function promptFor(renderer) {
   if (renderer === 'babylon') return BABYLON_PROMPT
   if (renderer === 'blender') return BLENDER_PROMPT
@@ -24,16 +11,80 @@ function promptFor(renderer) {
   return SYSTEM_PROMPT
 }
 
+async function getIdToken() {
+  const user = auth?.currentUser
+  if (!user) throw new Error('Sign in to generate models')
+  return user.getIdToken()
+}
+
+async function callAnthropic(systemText, messages, onStatus, { maxTokens = 24000 } = {}) {
+  onStatus?.('loading')
+  const token = await getIdToken()
+  const res = await fetch('/api/anthropic', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-7',
+      max_tokens: maxTokens,
+      system: [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
+      messages,
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Anthropic ${res.status}: ${err.slice(0, 320)}`)
+  }
+  return readAnthropicStream(res, onStatus)
+}
+
+async function readAnthropicStream(res, onStatus) {
+  let text = ''
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let firstChunk = true
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let idx
+    while ((idx = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, idx).trim()
+      buffer = buffer.slice(idx + 1)
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (!payload) continue
+      try {
+        const obj = JSON.parse(payload)
+        if (obj.type === 'content_block_delta' && obj.delta?.type === 'text_delta') {
+          if (firstChunk) { onStatus?.('writing'); firstChunk = false }
+          text += obj.delta.text
+        }
+      } catch { /* skip non-JSON keepalives / event lines */ }
+    }
+  }
+  return text
+}
+
 export async function generate3DModel(userPrompt, renderer = 'threejs', { onStatus } = {}) {
-  return _stream(
+  const text = await callAnthropic(
+    promptFor(renderer),
     [{ role: 'user', content: `Create a 3D model: ${userPrompt}` }],
-    renderer,
     onStatus,
   )
+  const data = parseJSON(text)
+  data.timestamp = Date.now()
+  data.renderer = renderer
+  data.brain = 'claude'
+  return data
 }
 
 export async function generate3DFromImage(base64, mimeType, userPrompt, renderer = 'threejs', { onStatus } = {}) {
-  return _stream(
+  const text = await callAnthropic(
+    promptFor(renderer),
     [{
       role: 'user',
       content: [
@@ -41,36 +92,16 @@ export async function generate3DFromImage(base64, mimeType, userPrompt, renderer
         { type: 'text', text: userPrompt || 'Create a 3D model inspired by this image.' },
       ],
     }],
-    renderer,
     onStatus,
   )
-}
-
-async function _stream(messages, renderer, onStatus) {
-  onStatus?.('loading')
-  let text = ''
-  try {
-    const stream = client().messages.stream({
-      model: 'claude-opus-4-7',
-      max_tokens: 24000,
-      system: [{ type: 'text', text: promptFor(renderer), cache_control: { type: 'ephemeral' } }],
-      messages,
-    })
-    for await (const ev of stream) {
-      if (ev.type === 'content_block_start' && ev.content_block.type === 'text') onStatus?.('writing')
-      if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') text += ev.delta.text
-    }
-  } catch (e) {
-    // Attach the raw message for better debugging
-    throw new Error(e.message || String(e))
-  }
   const data = parseJSON(text)
   data.timestamp = Date.now()
   data.renderer = renderer
+  data.brain = 'claude'
   return data
 }
 
-// Escape literal newlines/tabs that appear inside JSON string values
+// ── JSON extraction (shared shape with geminiClient) ──
 function sanitizeJSON(s) {
   let out = '', inStr = false, esc = false
   for (let i = 0; i < s.length; i++) {
@@ -88,7 +119,6 @@ function sanitizeJSON(s) {
   return out
 }
 
-// Extract the outermost {...} from a string, respecting strings and escape sequences
 function extractJSON(s) {
   let start = -1, depth = 0, inStr = false, esc = false
   for (let i = 0; i < s.length; i++) {
@@ -98,9 +128,7 @@ function extractJSON(s) {
     if (c === '"') { inStr = !inStr; continue }
     if (inStr) continue
     if (c === '{') { if (start === -1) start = i; depth++ }
-    else if (c === '}') {
-      if (--depth === 0 && start !== -1) return s.slice(start, i + 1)
-    }
+    else if (c === '}') { if (--depth === 0 && start !== -1) return s.slice(start, i + 1) }
   }
   return null
 }
@@ -112,14 +140,11 @@ function tryParse(s) {
 }
 
 function parseJSON(text) {
-  // Try every code block in order
   for (const [, content] of text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)) {
     const r = tryParse(content.trim()); if (r) return r
   }
-  // Robust brace extraction
   const raw = extractJSON(text)
   if (raw) { const r = tryParse(raw); if (r) return r }
-  // Truncation: a JSON code block was opened but never closed
   console.error('Claude response could not be parsed:\n', text)
   if (/```(?:json)?\s*\{/.test(text || '') && !/```\s*$/.test((text || '').trimEnd())) {
     throw new Error('Response was cut off before completing the model. Try a simpler prompt or increase max_tokens.')
