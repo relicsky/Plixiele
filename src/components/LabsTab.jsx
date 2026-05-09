@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import SceneBuilder from './SceneBuilder.jsx'
 import LabsHome from './LabsHome.jsx'
+import SoundLab from './SoundLab.jsx'
 
 // ── shader re-use helper ──
 const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -130,7 +131,7 @@ function UniformControl({ name, def, onChange }) {
 }
 
 // ── Main Labs component ──
-const FEATURE_TITLES = { scene: 'Scene Builder', shader: 'Shader Lab' }
+const FEATURE_TITLES = { scene: 'Scene Builder', shader: 'Shader Lab', sound: 'Sound Lab' }
 
 export default function LabsTab() {
   const [active, setActive] = useState(null)
@@ -149,7 +150,9 @@ export default function LabsTab() {
         <button className="labs-back" onClick={() => setActive(null)}>← Back to Labs</button>
         <span className="labs-crumb">{FEATURE_TITLES[active]}</span>
       </div>
-      {active === 'scene' ? <SceneBuilder /> : <ShaderLab />}
+      {active === 'scene' && <SceneBuilder />}
+      {active === 'shader' && <ShaderLab />}
+      {active === 'sound' && <SoundLab />}
     </div>
   )
 }

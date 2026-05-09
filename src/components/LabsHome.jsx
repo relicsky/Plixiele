@@ -13,6 +13,13 @@ const FEATURES = [
     blurb: 'Tweak GLSL shaders and uniforms on any model in real time.',
     accent: '#a855f7',
   },
+  {
+    key: 'sound',
+    icon: '♫',
+    title: 'Sound Lab',
+    blurb: 'AI-generated sound effects and short music. Plays in browser, exports as WAV. (50 credits)',
+    accent: '#7cffa8',
+  },
 ]
 
 export default function LabsHome({ onPick }) {

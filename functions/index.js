@@ -22,7 +22,7 @@ const PLAN_CREDITS = {
   pro:     1500,
   premium: 5000,
 }
-const COST = { gen: 10, chat: 2 }
+const COST = { gen: 10, chat: 2, sound: 50 }
 
 // Dev / staff allowlist — these emails are auto-upgraded to Premium with
 // full credits regardless of subscription status. Add yourself here.
@@ -98,7 +98,9 @@ async function ensureProfile(uid, email) {
 }
 
 function intentFromBody(body) {
-  // Heuristic: model gens use big max_tokens; chat uses small.
+  // Explicit intent wins (e.g. sound generation costs 50 even though it's
+  // a small model call). Fallback heuristic: big max_tokens = gen, small = chat.
+  if (body?._intent && COST[body._intent]) return body._intent
   const max = body?.max_tokens || body?.generationConfig?.maxOutputTokens || 0
   return max >= 16000 ? 'gen' : 'chat'
 }
@@ -155,6 +157,7 @@ async function gateAndProxy({ req, res, providerName, callUpstream }) {
       // Refund on upstream error so the user isn't charged for failed requests.
       await db.doc(`users/${user.uid}`).update({ credits: FieldValue.increment(cost) })
       const errText = await upstream.text()
+      console.error(`${providerName} upstream error: ${upstream.status}`, errText.slice(0, 500))
       res.status(upstream.status).send(errText)
       return
     }
@@ -191,15 +194,18 @@ export const anthropicProxy = onRequest(
   async (req, res) => {
     await gateAndProxy({
       req, res, providerName: 'anthropic',
-      callUpstream: () => fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY.value(),
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({ ...req.body, stream: true }),
-      }),
+      callUpstream: () => {
+        const { _intent, _variant, ...payload } = req.body || {}
+        return fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY.value(),
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({ ...payload, stream: true }),
+        })
+      },
     })
   },
 )
@@ -209,7 +215,7 @@ export const geminiProxy = onRequest(
   { region: 'us-central1', secrets: [GEMINI_API_KEY], cors: false, timeoutSeconds: 540, memory: '512MiB' },
   async (req, res) => {
     const variant = (req.body?._variant === 'pro') ? 'gemini-2.5-pro' : 'gemini-2.5-flash'
-    const { _variant, ...payload } = req.body || {}
+    const { _variant, _intent, ...payload } = req.body || {}
     await gateAndProxy({
       req, res, providerName: 'gemini',
       callUpstream: () => fetch(
