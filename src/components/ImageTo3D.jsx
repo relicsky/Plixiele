@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-import { generate3DFromImage } from '../lib/claudeClient.js'
+import { generate3DFromImage as claudeFromImage } from '../lib/claudeClient.js'
+import { generate3DFromImage as geminiFromImage } from '../lib/geminiClient.js'
 import ThreeViewer from './ThreeViewer.jsx'
 import CodeOutput from './CodeOutput.jsx'
 import RendererSelect from './RendererSelect.jsx'
@@ -38,7 +39,7 @@ function resizeImage(file, maxPx = 768) {
 }
 
 export default function ImageTo3D() {
-  const { activeSession, createSession, updateSession, renderer, shaderLang } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain } = useApp()
   const sess = activeSession.image
   const [imgData, setImgData]   = useState(sess?.imageData || null)
   const [messages, setMessages] = useState(sess?.messages || [])
@@ -81,7 +82,8 @@ export default function ImageTo3D() {
 
     try {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
-      const data = await generate3DFromImage(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus })
+      const generate = aiBrain === 'gemini' ? geminiFromImage : claudeFromImage
+      const data = await generate(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',

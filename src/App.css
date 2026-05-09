@@ -544,6 +544,10 @@
   background: rgba(34,211,238,.12); color: var(--accent2);
   box-shadow: inset 0 0 0 1px rgba(34,211,238,.35);
 }
+.brain-toggle .shader-toggle-opt.active {
+  background: rgba(124,58,237,.14); color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(124,58,237,.4);
+}
 
 .chat-col-header {
   padding: 10px 12px;

@@ -11,6 +11,10 @@ export function AppProvider({ children }) {
   const [mode, setMode]         = useState('model')
   const [renderer, setRenderer] = useState('threejs')
   const [shaderLang, setShaderLang] = useState('glsl')
+  const [aiBrain, setAiBrainState] = useState(() => localStorage.getItem('plixie_brain') || 'claude')
+  const [plan, setPlanState] = useState(() => localStorage.getItem('plixie_plan') || 'free')
+  const setAiBrain = (b) => { localStorage.setItem('plixie_brain', b); setAiBrainState(b) }
+  const setPlan    = (p) => { localStorage.setItem('plixie_plan', p);   setPlanState(p) }
   const [sessions, setSessions] = useState(() => S.getSessions())
   const [activeId, setActiveId] = useState({ model: null, image: null, code: null })
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
@@ -196,6 +200,8 @@ export function AppProvider({ children }) {
       mode, setMode,
       renderer, setRenderer,
       shaderLang, setShaderLang,
+      aiBrain, setAiBrain,
+      plan, setPlan,
       sessions, activeSession, activeId,
       createSession, updateSession, removeSession, loadSession,
       communityPosts, publishToCommunity, unpublishCommunity,

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-import { generate3DModel } from '../lib/claudeClient.js'
+import { generate3DModel as claudeGenerate } from '../lib/claudeClient.js'
+import { generate3DModel as geminiGenerate } from '../lib/geminiClient.js'
 import ThreeViewer from './ThreeViewer.jsx'
 import CodeOutput from './CodeOutput.jsx'
 import RendererSelect from './RendererSelect.jsx'
@@ -19,7 +20,7 @@ const EXAMPLES = [
 ]
 
 export default function ModelGenerator() {
-  const { activeSession, createSession, updateSession, renderer, shaderLang } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain } = useApp()
   const sess = activeSession.model
   const [messages, setMessages] = useState(sess?.messages || [])
   const [modelData, setModelData] = useState(sess?.modelData || null)
@@ -52,7 +53,8 @@ export default function ModelGenerator() {
 
     try {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
-      const data = await generate3DModel(text, effective, { onStatus: setStatus })
+      const generate = aiBrain === 'gemini' ? geminiGenerate : claudeGenerate
+      const data = await generate(text, effective, { onStatus: setStatus })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',
