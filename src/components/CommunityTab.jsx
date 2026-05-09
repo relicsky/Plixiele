@@ -79,20 +79,18 @@ function ModelCard({ model, isUserPost, onDelete }) {
     if (!model.hlsl) return
     const sess = createSession('model')
     const data = {
-      type: 'hlsl',
-      renderer: 'hlsl',
-      description: model.modelData.description,
-      code: model.hlsl,
+      ...model.modelData,
+      hlslSource: model.hlsl,
       timestamp: Date.now(),
     }
     const aMsg = {
       role: 'assistant',
-      content: `✦ ${data.description} — HLSL shader`,
+      content: `✦ ${data.description} — rendered with GLSL, HLSL shader available`,
       modelData: data, ts: Date.now(),
     }
     updateSession(sess.id, { messages: [aMsg], modelData: data, title: `${model.title} (HLSL)` })
     setRenderer('threejs')
-    setShaderLang('hlsl')
+    setShaderLang('glsl')
     setMode('model')
   }
 

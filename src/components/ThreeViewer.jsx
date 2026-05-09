@@ -160,6 +160,16 @@ export default function ThreeViewer({ modelData, isGenerating }) {
     finally { setExporting(false) }
   }
 
+  function downloadHLSL() {
+    if (!modelData?.hlslSource) return
+    const blob = new Blob([modelData.hlslSource], { type: 'text/plain' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'plixie-shader.hlsl'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <div className="viewer">
       <div className="viewer-toolbar">
@@ -177,6 +187,12 @@ export default function ThreeViewer({ modelData, isGenerating }) {
               disabled={exporting} title="Download GLB 3D model">
               {exporting ? 'Exporting…' : '↓ GLB'}
             </button>
+            {modelData.hlslSource && (
+              <button className="viewer-btn viewer-btn-outlined" onClick={downloadHLSL}
+                title="Download HLSL shader (Unity / Unreal)">
+                ↓ HLSL
+              </button>
+            )}
             <button className="viewer-btn" onClick={() => setPublishOpen(true)} disabled={justPublished}>
               {justPublished ? '✓ Published' : '⇧ Publish'}
             </button>
