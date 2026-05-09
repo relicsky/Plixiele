@@ -138,30 +138,30 @@ function ContextBridge({ onReady }) {
 
 export default function ThreeViewer({ modelData, isGenerating }) {
   const [wireframe, setWireframe] = useState(false)
-  const [showDl, setShowDl] = useState(false)
   const [threeCtx, setThreeCtx] = useState(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [justPublished, setJustPublished] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   function downloadPNG() {
-    setShowDl(false)
     if (!threeCtx) return
     threeCtx.gl.render(threeCtx.scene, threeCtx.camera)
     const a = document.createElement('a')
-    a.download = 'plixie-render.png'
+    a.download = 'plixie-model.png'
     a.href = threeCtx.gl.domElement.toDataURL('image/png')
     a.click()
   }
 
   async function downloadGLB() {
-    setShowDl(false)
-    if (!modelData) return
+    if (!modelData || exporting) return
+    setExporting(true)
     try { await downloadModelGLB(modelData, 'plixie-model.glb') }
     catch (e) { console.error('GLB export failed', e) }
+    finally { setExporting(false) }
   }
 
   return (
-    <div className="viewer" onClick={() => showDl && setShowDl(false)}>
+    <div className="viewer">
       <div className="viewer-toolbar">
         <button className="viewer-btn" onClick={() => setWireframe(w => !w)}>
           {wireframe ? '■ Solid' : '⬡ Wire'}
@@ -169,31 +169,14 @@ export default function ThreeViewer({ modelData, isGenerating }) {
 
         {modelData && (
           <>
-            <div className="dl-wrap" onClick={e => e.stopPropagation()}>
-              <button className="viewer-btn viewer-btn-accent" onClick={() => setShowDl(d => !d)}>
-                ↓ Download
-              </button>
-              {showDl && (
-                <div className="dl-dropdown">
-                  <div className="dl-row">
-                    <span className="dl-icon">📷</span>
-                    <div className="dl-info">
-                      <span className="dl-name">PNG</span>
-                      <span className="dl-desc">Screenshot of the current view</span>
-                    </div>
-                    <button className="dl-go" onClick={downloadPNG} title="Download PNG">↓</button>
-                  </div>
-                  <div className="dl-row">
-                    <span className="dl-icon">📦</span>
-                    <div className="dl-info">
-                      <span className="dl-name">GLB</span>
-                      <span className="dl-desc">3D model for Blender, Unity, etc.</span>
-                    </div>
-                    <button className="dl-go" onClick={downloadGLB} title="Download GLB">↓</button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button className="viewer-btn viewer-btn-outlined" onClick={downloadPNG}
+              title="Download PNG screenshot">
+              ↓ PNG
+            </button>
+            <button className="viewer-btn viewer-btn-outlined" onClick={downloadGLB}
+              disabled={exporting} title="Download GLB 3D model">
+              {exporting ? 'Exporting…' : '↓ GLB'}
+            </button>
             <button className="viewer-btn" onClick={() => setPublishOpen(true)} disabled={justPublished}>
               {justPublished ? '✓ Published' : '⇧ Publish'}
             </button>

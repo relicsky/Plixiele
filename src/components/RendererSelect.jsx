@@ -4,6 +4,7 @@ const OPTIONS = [
   { key: 'threejs',  label: 'Three.js',    badge: 'GL'  },
   { key: 'babylon',  label: 'Babylon.js',  badge: 'BJS' },
   { key: 'blender',  label: 'Blender Py',  badge: 'PY'  },
+  { key: 'hlsl',     label: 'HLSL',        badge: 'HLSL' },
 ]
 
 export default function RendererSelect() {

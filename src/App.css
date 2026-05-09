@@ -721,6 +721,20 @@
   cursor: pointer; transition: color .13s;
 }
 .viewer-btn:hover { color: var(--text); }
+.viewer-btn:disabled { opacity: .45; cursor: not-allowed; }
+.viewer-btn-outlined {
+  background: transparent !important;
+  border-color: rgba(34,211,238,.5) !important;
+  color: var(--accent2) !important;
+  font-weight: 600;
+  letter-spacing: .02em;
+  transition: background .13s, color .13s, border-color .13s !important;
+}
+.viewer-btn-outlined:hover:not(:disabled) {
+  background: rgba(34,211,238,.14) !important;
+  border-color: var(--accent2) !important;
+  color: #fff !important;
+}
 .viewer-info {
   background: rgba(10,10,24,.75); backdrop-filter: blur(8px);
   border: 1px solid var(--border); border-radius: var(--r-sm);
@@ -1310,15 +1324,31 @@
 }
 .dl-go:hover { background: var(--accent); color: #fff; }
 
-/* Scene Builder download dropdown anchor + terrain toggle */
-.scene-dl-wrap { position: relative; }
-.scene-dl-dropdown {
-  position: absolute; top: calc(100% + 4px); right: 0; left: auto;
-  width: 280px; z-index: 50;
-  background: var(--surface2); border: 1px solid var(--border-bright);
-  border-radius: var(--r); box-shadow: 0 12px 30px rgba(0,0,0,.45);
-  overflow: hidden;
+/* Scene Builder download buttons (outlined, inline) */
+.scene-downloadbar {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  padding: 0 4px 12px; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
 }
+.scene-dl-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent;
+  border: 1px solid rgba(34,211,238,.5);
+  color: var(--accent2);
+  padding: 8px 10px; border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 600; letter-spacing: .02em;
+  cursor: pointer; transition: background .13s, color .13s, border-color .13s, transform .1s;
+}
+.scene-dl-btn:hover:not(:disabled) {
+  background: rgba(34,211,238,.14);
+  border-color: var(--accent2);
+  color: #fff;
+}
+.scene-dl-btn:active:not(:disabled) { transform: translateY(1px); }
+.scene-dl-btn:disabled { opacity: .4; cursor: not-allowed; border-color: var(--border); color: var(--text-3); }
+.scene-dl-icon { font-size: 14px; line-height: 1; }
+.scene-dl-name { flex: 1; text-align: left; }
+.scene-dl-arrow { font-size: 14px; font-weight: 700; }
 
 .scene-toggle-row {
   display: flex; flex-direction: column; gap: 6px;

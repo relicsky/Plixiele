@@ -191,7 +191,6 @@ export default function SceneBuilder() {
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [downloading, setDownloading] = useState(false)
-  const [showDl, setShowDl] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [librarySearch, setLibrarySearch] = useState('')
   const [showLibrary, setShowLibrary] = useState(true)
@@ -391,10 +390,9 @@ export default function SceneBuilder() {
 
   async function runDownloadGLB() {
     if (items.length === 0) return
-    setShowDl(false)
     setDownloading(true)
     try {
-      await downloadSceneGLB(items, 'plixie-scene.glb', sceneTitle || 'plixie-scene')
+      await downloadSceneGLB(items, (sceneTitle || 'plixie-scene') + '.glb', sceneTitle || 'plixie-scene')
     } catch (e) {
       setError(e.message || 'GLB export failed')
     } finally {
@@ -403,8 +401,7 @@ export default function SceneBuilder() {
   }
 
   function runDownloadPNG() {
-    setShowDl(false)
-    if (!threeCtx) return
+    if (!threeCtx || items.length === 0) return
     threeCtx.gl.render(threeCtx.scene, threeCtx.camera)
     const a = document.createElement('a')
     a.download = (sceneTitle || 'plixie-scene') + '.png'
@@ -427,7 +424,7 @@ export default function SceneBuilder() {
   const sceneStatus = activeSceneId ? (savedFlash ? 'Saved ✓' : 'Editing saved scene') : (isDirty ? 'Unsaved' : 'Empty')
 
   return (
-    <div className="scene-builder" onClick={() => showDl && setShowDl(false)}>
+    <div className="scene-builder">
       <div className="scene-sidebar">
         <div className="scene-titlebar">
           <input
@@ -445,34 +442,25 @@ export default function SceneBuilder() {
           <button className="scene-icon-btn" onClick={newScene} title="New scene">＋ New</button>
           <button className="scene-icon-btn" onClick={saveCurrentScene}
             disabled={items.length === 0} title="Save scene">⌘ Save</button>
-          <div className="scene-dl-wrap" onClick={e => e.stopPropagation()}>
-            <button className="scene-icon-btn primary"
-              onClick={() => setShowDl(d => !d)}
-              disabled={items.length === 0 || downloading}
-              title="Download">
-              {downloading ? '…' : '↓ Download'}
-            </button>
-            {showDl && (
-              <div className="dl-dropdown scene-dl-dropdown">
-                <div className="dl-row">
-                  <span className="dl-icon">📷</span>
-                  <div className="dl-info">
-                    <span className="dl-name">PNG</span>
-                    <span className="dl-desc">Screenshot of current view</span>
-                  </div>
-                  <button className="dl-go" onClick={runDownloadPNG} title="Download PNG">↓</button>
-                </div>
-                <div className="dl-row">
-                  <span className="dl-icon">📦</span>
-                  <div className="dl-info">
-                    <span className="dl-name">GLB</span>
-                    <span className="dl-desc">3D scene for Blender, Unity, etc.</span>
-                  </div>
-                  <button className="dl-go" onClick={runDownloadGLB} title="Download GLB">↓</button>
-                </div>
-              </div>
-            )}
-          </div>
+        </div>
+
+        <div className="scene-downloadbar">
+          <button className="scene-dl-btn"
+            onClick={runDownloadPNG}
+            disabled={items.length === 0}
+            title="Download PNG screenshot">
+            <span className="scene-dl-icon">📷</span>
+            <span className="scene-dl-name">PNG</span>
+            <span className="scene-dl-arrow">↓</span>
+          </button>
+          <button className="scene-dl-btn"
+            onClick={runDownloadGLB}
+            disabled={items.length === 0 || downloading}
+            title="Download GLB 3D scene">
+            <span className="scene-dl-icon">📦</span>
+            <span className="scene-dl-name">{downloading ? '…' : 'GLB'}</span>
+            <span className="scene-dl-arrow">↓</span>
+          </button>
         </div>
 
         <div className="scene-toggle-row">

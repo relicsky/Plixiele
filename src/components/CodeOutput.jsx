@@ -83,9 +83,11 @@ export default function CodeOutput({ modelData }) {
 
   const isBabylon = modelData.type === 'babylonjs' || modelData.renderer === 'babylon'
   const isBlender = modelData.type === 'blender'   || modelData.renderer === 'blender'
+  const isHlsl    = modelData.type === 'hlsl'      || modelData.renderer === 'hlsl'
   const code    = modelData.code || modelData.pythonScript || ''
-  const lang    = isBabylon ? 'javascript' : 'python'
-  const filename = isBlender ? 'plixie_model.py' : 'plixie_model.js'
+  const lang    = isHlsl ? 'hlsl' : isBabylon ? 'javascript' : 'python'
+  const filename = isHlsl ? 'plixie_shader.hlsl' : isBlender ? 'plixie_model.py' : 'plixie_model.js'
+  const badgeLabel = isHlsl ? 'HLSL Shader' : isBabylon ? 'Babylon.js' : 'Blender Python'
 
   function handleCopy() {
     copyText(code)
@@ -97,7 +99,7 @@ export default function CodeOutput({ modelData }) {
     <div className="code-output">
       <div className="co-header">
         <div className="co-meta">
-          <span className="co-badge">{isBabylon ? 'Babylon.js' : 'Blender Python'}</span>
+          <span className="co-badge">{badgeLabel}</span>
           <span className="co-desc">{modelData.description}</span>
         </div>
         <div className="co-actions">
@@ -114,6 +116,9 @@ export default function CodeOutput({ modelData }) {
           )}
           {isBlender && (
             <span className="co-hint">Paste into Blender → Scripting tab → Run</span>
+          )}
+          {isHlsl && (
+            <span className="co-hint">Drop into Unity (ShaderLab wrapper) or paste into an Unreal Custom node</span>
           )}
         </div>
       </div>

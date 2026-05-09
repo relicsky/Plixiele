@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { SYSTEM_PROMPT } from './systemPrompt.js'
 import { BABYLON_PROMPT } from './babylonPrompt.js'
 import { BLENDER_PROMPT } from './blenderPrompt.js'
+import { HLSL_PROMPT } from './hlslPrompt.js'
 
 let _client = null
 
@@ -19,6 +20,7 @@ function client() {
 function promptFor(renderer) {
   if (renderer === 'babylon') return BABYLON_PROMPT
   if (renderer === 'blender') return BLENDER_PROMPT
+  if (renderer === 'hlsl')    return HLSL_PROMPT
   return SYSTEM_PROMPT
 }
 
