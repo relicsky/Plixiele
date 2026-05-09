@@ -47,9 +47,11 @@ function Terms() {
       Output quality is best-effort and never guaranteed.</p>
 
       <h2>2. Accounts</h2>
-      <p>You must be at least 13 years old (or the age of digital consent in your country)
-      to use Plixiele. You're responsible for the security of your password and for any
-      activity under your account.</p>
+      <p>You must be at least 10 years old to use Plixiele. If you are under the age
+      of digital consent in your country (in the US, that's 13 under COPPA), a parent
+      or legal guardian must consent on your behalf and supervise your use. You're
+      responsible for the security of your password and for any activity under your
+      account.</p>
 
       <h2>3. Plans, credits, and billing</h2>
       <ul>
@@ -157,8 +159,10 @@ function Privacy() {
       browser bundle.</p>
 
       <h2>8. Children</h2>
-      <p>Plixiele is not directed at children under 13. If you believe a child
-      under 13 has created an account, please contact us so we can remove it.</p>
+      <p>Plixiele is not directed at children under 10. For users between 10 and
+      the age of digital consent in their country, parental supervision is
+      required. If you believe a child under 10 has created an account, please
+      contact us so we can remove it.</p>
 
       <h2>9. Changes</h2>
       <p>If this policy materially changes we'll notify you in-app or by email.</p>
