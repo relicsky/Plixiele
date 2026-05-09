@@ -12,12 +12,13 @@ const EXAMPLES = [
 ]
 
 export default function SoundLab() {
-  const { aiBrain, aiVariant, plan } = useApp()
+  const { aiBrain, aiVariant, plan, savedSounds, persistSound, removeSound } = useApp()
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState(null)
   const [error, setError] = useState('')
   const [sound, setSound] = useState(null)
+  const [savedFlash, setSavedFlash] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const ctxRef = useRef(null)
 
@@ -75,6 +76,24 @@ export default function SoundLab() {
     }
   }
 
+  function save() {
+    if (!sound) return
+    const saved = persistSound({
+      ...sound,
+      title: sound.title || sound.description,
+    })
+    setSound(saved)
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 1600)
+  }
+
+  function loadSaved(s) {
+    stopCurrent()
+    setSound(s)
+    setPrompt(s.prompt || '')
+    setError('')
+  }
+
   return (
     <div className="sound-lab">
       <div className="sound-lab-head">
@@ -122,9 +141,36 @@ export default function SoundLab() {
           <div className="sound-lab-actions">
             <button className="sound-lab-play" onClick={play}>▶ Play</button>
             <button className="sound-lab-stop" onClick={stopCurrent}>■ Stop</button>
+            <button className="sound-lab-save" onClick={save} disabled={savedFlash}>
+              {savedFlash ? '✓ Saved' : '⌘ Save'}
+            </button>
             <button className="sound-lab-download" onClick={download} disabled={downloading}>
               {downloading ? 'Rendering…' : '↓ WAV'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {savedSounds.length > 0 && (
+        <div className="sound-lab-saved">
+          <div className="sound-lab-saved-head">
+            Saved sounds <span className="sound-lab-saved-count">{savedSounds.length}</span>
+          </div>
+          <div className="sound-lab-saved-list">
+            {savedSounds.map(s => (
+              <div key={s.id} className="sound-lab-saved-row">
+                <div className="sound-lab-saved-info" onClick={() => loadSaved(s)}>
+                  <span className="sound-lab-saved-title">{s.title || s.description}</span>
+                  <span className="sound-lab-saved-meta">{s.duration}s</span>
+                </div>
+                <button className="sound-lab-saved-play"
+                  onClick={() => { stopCurrent(); ctxRef.current = playSound(s) }}
+                  title="Play">▶</button>
+                <button className="sound-lab-saved-del"
+                  onClick={() => removeSound(s.id)}
+                  title="Delete">×</button>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -34,6 +34,7 @@ export function AppProvider({ children }) {
   const [activeId, setActiveId] = useState({ model: null, image: null, code: null })
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
   const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
+  const [savedSounds, setSavedSounds] = useState(() => S.getSounds())
 
   const cloudUid = useMemo(
     () => (isFirebaseReady() && user?.uid && !user.uid.startsWith('local_')) ? user.uid : null,
@@ -57,16 +58,19 @@ export function AppProvider({ children }) {
     if (!cloudUid) {
       setSessions(S.getSessions())
       setSavedScenes(S.getScenes())
+      setSavedSounds(S.getSounds())
       return
     }
     F.migrateLocalToCloud(cloudUid, {
       sessions: S.getSessions(),
       scenes: S.getScenes(),
+      sounds: S.getSounds(),
       community: S.getCommunityPosts(),
     }, user)
     const unsubA = F.watchUserCollection(cloudUid, 'sessions', setSessions)
     const unsubB = F.watchUserCollection(cloudUid, 'scenes', setSavedScenes)
-    return () => { unsubA(); unsubB() }
+    const unsubC = F.watchUserCollection(cloudUid, 'sounds', setSavedSounds)
+    return () => { unsubA(); unsubB(); unsubC() }
   }, [cloudUid, user])
 
   // Community feed — Firestore when available, localStorage otherwise.
@@ -233,6 +237,42 @@ export function AppProvider({ children }) {
     }
   }, [cloudUid])
 
+  const persistSound = useCallback((sound) => {
+    const full = {
+      id: sound.id || S.newId(),
+      title: sound.title || sound.description || 'Untitled sound',
+      description: sound.description || '',
+      duration: sound.duration || 0,
+      code: sound.code || '',
+      prompt: sound.prompt || '',
+      brain: sound.brain || null,
+      createdAt: sound.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    }
+    if (cloudUid) {
+      F.saveUserDoc(cloudUid, 'sounds', full)
+      setSavedSounds(prev => {
+        const idx = prev.findIndex(s => s.id === full.id)
+        if (idx >= 0) { const next = [...prev]; next[idx] = full; return next }
+        return [full, ...prev]
+      })
+    } else {
+      S.saveSound(full)
+      setSavedSounds(S.getSounds())
+    }
+    return full
+  }, [cloudUid])
+
+  const removeSound = useCallback((id) => {
+    if (cloudUid) {
+      F.deleteUserDoc(cloudUid, 'sounds', id)
+      setSavedSounds(prev => prev.filter(s => s.id !== id))
+    } else {
+      S.deleteSound(id)
+      setSavedSounds(S.getSounds())
+    }
+  }, [cloudUid])
+
   const activeSession = {
     model: sessions.find(s => s.id === activeId.model) || null,
     image: sessions.find(s => s.id === activeId.image) || null,
@@ -253,6 +293,7 @@ export function AppProvider({ children }) {
       createSession, updateSession, removeSession, loadSession,
       communityPosts, publishToCommunity, unpublishCommunity,
       savedScenes, persistScene, removeScene,
+      savedSounds, persistSound, removeSound,
     }}>
       {children}
     </Ctx.Provider>

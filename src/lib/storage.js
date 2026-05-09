@@ -3,6 +3,7 @@ const KEYS = {
   SESSIONS: 'plixie_sessions',
   COMMUNITY: 'plixie_community_posts',
   SCENES: 'plixie_saved_scenes',
+  SOUNDS: 'plixie_saved_sounds',
 }
 
 function read(key, fallback = null) {
@@ -65,4 +66,19 @@ export function saveScene(scene) {
 
 export function deleteScene(id) {
   write(KEYS.SCENES, getScenes().filter(s => s.id !== id))
+}
+
+// Saved sounds (Sound Lab)
+export const getSounds = () => read(KEYS.SOUNDS, [])
+
+export function saveSound(sound) {
+  const all = getSounds()
+  const idx = all.findIndex(s => s.id === sound.id)
+  if (idx >= 0) all[idx] = sound
+  else all.unshift(sound)
+  write(KEYS.SOUNDS, all)
+}
+
+export function deleteSound(id) {
+  write(KEYS.SOUNDS, getSounds().filter(s => s.id !== id))
 }

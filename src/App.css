@@ -1992,4 +1992,48 @@
 .sound-lab-download { border-color: rgba(34,211,238,.5); color: var(--accent2); }
 .sound-lab-download:hover:not(:disabled) { background: rgba(34,211,238,.14); color: #fff; }
 .sound-lab-download:disabled { opacity: .5; cursor: not-allowed; }
+.sound-lab-save { border-color: var(--border-bright); }
+.sound-lab-save:hover:not(:disabled) { background: var(--surface-hover); }
+
+.sound-lab-saved {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-top: 8px; border-top: 1px solid var(--border);
+}
+.sound-lab-saved-head {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--text-3);
+  display: flex; align-items: center; gap: 8px;
+}
+.sound-lab-saved-count {
+  font-size: 10px; color: var(--text-3);
+  background: var(--surface); padding: 1px 7px; border-radius: 8px;
+  text-transform: none; letter-spacing: 0;
+}
+.sound-lab-saved-list { display: flex; flex-direction: column; gap: 4px; }
+.sound-lab-saved-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  padding: 8px 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  transition: border-color .12s;
+}
+.sound-lab-saved-row:hover { border-color: var(--border-bright); }
+.sound-lab-saved-info {
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer; min-width: 0;
+}
+.sound-lab-saved-title {
+  flex: 1; font-size: 12.5px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sound-lab-saved-meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.sound-lab-saved-play, .sound-lab-saved-del {
+  background: none; border: 1px solid transparent; color: var(--text-3);
+  width: 28px; height: 28px; border-radius: 4px;
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.sound-lab-saved-play:hover { color: #7cffa8; border-color: rgba(124,255,168,.3); }
+.sound-lab-saved-del:hover  { color: var(--error); border-color: rgba(248,113,113,.3); }
 
