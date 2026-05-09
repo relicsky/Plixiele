@@ -40,7 +40,7 @@ const TIERS = [
     credits: 1500,
     features: [
       '150 generations / month',
-      'Claude (Opus)',
+      'Claude Sonnet',
       'Everything in Basic',
       'AI brain toggle (switch Gemini ↔ Claude)',
     ],
@@ -55,7 +55,7 @@ const TIERS = [
     credits: 5000,
     features: [
       '300 generations + 1000 chats',
-      'Best Claude model available',
+      'Claude Opus (top tier)',
       'Priority queue',
       'Early access to new features',
     ],

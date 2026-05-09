@@ -7,13 +7,18 @@ async function getIdToken() {
   return user.getIdToken()
 }
 
-async function streamClaude(messages, hooks) {
+const CLAUDE_MODEL = {
+  pro:     'claude-sonnet-4-6',
+  premium: 'claude-opus-4-7',
+}
+
+async function streamClaude(messages, hooks, variant = 'pro') {
   const token = await getIdToken()
   const res = await fetch('/api/anthropic', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({
-      model: 'claude-opus-4-7',
+      model: CLAUDE_MODEL[variant] || CLAUDE_MODEL.pro,
       max_tokens: 4096,
       system: [{ type: 'text', text: CODING_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages,
@@ -100,11 +105,11 @@ async function streamGemini(messages, hooks, variant = 'flash') {
   return full
 }
 
-export async function streamCodingReply(messages, { onChunk, onDone, onError, brain = 'claude', variant = 'flash' } = {}) {
+export async function streamCodingReply(messages, { onChunk, onDone, onError, brain = 'claude', variant = 'pro' } = {}) {
   try {
     const full = brain === 'gemini'
-      ? await streamGemini(messages, { onChunk }, variant)
-      : await streamClaude(messages, { onChunk })
+      ? await streamGemini(messages, { onChunk }, variant === 'premium' ? 'pro' : variant)
+      : await streamClaude(messages, { onChunk }, variant)
     onDone?.(full)
     return full
   } catch (e) {

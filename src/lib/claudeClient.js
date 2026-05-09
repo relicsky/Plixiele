@@ -17,7 +17,18 @@ async function getIdToken() {
   return user.getIdToken()
 }
 
-async function callAnthropic(systemText, messages, onStatus, { maxTokens = 24000 } = {}) {
+// Pro uses Sonnet, Premium uses Opus. Anything else gets Sonnet as a sensible default
+// (it won't get called for Free/Basic since they default to Gemini, but if someone
+// flips the dev override they still get a working call).
+const CLAUDE_MODEL = {
+  pro:     'claude-sonnet-4-6',
+  premium: 'claude-opus-4-7',
+}
+function modelForVariant(variant) {
+  return CLAUDE_MODEL[variant] || CLAUDE_MODEL.pro
+}
+
+async function callAnthropic(systemText, messages, onStatus, { maxTokens = 24000, variant = 'pro' } = {}) {
   onStatus?.('loading')
   const token = await getIdToken()
   const res = await fetch('/api/anthropic', {
@@ -27,7 +38,7 @@ async function callAnthropic(systemText, messages, onStatus, { maxTokens = 24000
       'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-7',
+      model: modelForVariant(variant),
       max_tokens: maxTokens,
       system: [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
       messages,
@@ -69,20 +80,21 @@ async function readAnthropicStream(res, onStatus) {
   return text
 }
 
-export async function generate3DModel(userPrompt, renderer = 'threejs', { onStatus } = {}) {
+export async function generate3DModel(userPrompt, renderer = 'threejs', { onStatus, variant = 'pro' } = {}) {
   const text = await callAnthropic(
     promptFor(renderer),
     [{ role: 'user', content: `Create a 3D model: ${userPrompt}` }],
     onStatus,
+    { variant },
   )
   const data = parseJSON(text)
   data.timestamp = Date.now()
   data.renderer = renderer
-  data.brain = 'claude'
+  data.brain = `claude-${variant === 'premium' ? 'opus' : 'sonnet'}`
   return data
 }
 
-export async function generate3DFromImage(base64, mimeType, userPrompt, renderer = 'threejs', { onStatus } = {}) {
+export async function generate3DFromImage(base64, mimeType, userPrompt, renderer = 'threejs', { onStatus, variant = 'pro' } = {}) {
   const text = await callAnthropic(
     promptFor(renderer),
     [{
@@ -93,11 +105,12 @@ export async function generate3DFromImage(base64, mimeType, userPrompt, renderer
       ],
     }],
     onStatus,
+    { variant },
   )
   const data = parseJSON(text)
   data.timestamp = Date.now()
   data.renderer = renderer
-  data.brain = 'claude'
+  data.brain = `claude-${variant === 'premium' ? 'opus' : 'sonnet'}`
   return data
 }
 

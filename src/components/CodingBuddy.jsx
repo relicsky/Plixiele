@@ -112,7 +112,9 @@ export default function CodingBuddy() {
     const apiMessages = newMsgs.map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const variant = plan === 'free' ? 'flash' : 'pro'
+      const variant = aiBrain === 'gemini'
+        ? (plan === 'free' ? 'flash' : 'pro')
+        : (plan === 'premium' ? 'premium' : 'pro')
       await streamCodingReply(apiMessages, {
         brain: aiBrain,
         variant,

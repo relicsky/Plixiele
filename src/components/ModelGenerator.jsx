@@ -55,7 +55,9 @@ export default function ModelGenerator() {
     try {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
       const generate = aiBrain === 'gemini' ? geminiGenerate : claudeGenerate
-      const variant = plan === 'free' ? 'flash' : 'pro'
+      const variant = aiBrain === 'gemini'
+        ? (plan === 'free' ? 'flash' : 'pro')
+        : (plan === 'premium' ? 'premium' : 'pro')
       const data = await generate(text, effective, { onStatus: setStatus, variant })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
@@ -92,7 +94,6 @@ export default function ModelGenerator() {
             <div className="empty-state">
               <div className="empty-icon">✦</div>
               <h3>Text to 3D</h3>
-              <p>Describe any object — Claude will generate it with separate parts and custom shaders.</p>
               <div className="examples">
                 {EXAMPLES.map(ex => (
                   <button key={ex} className="example-pill" onClick={() => send(ex)}>{ex}</button>
