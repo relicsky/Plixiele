@@ -40,7 +40,7 @@ function resizeImage(file, maxPx = 768) {
 }
 
 export default function ImageTo3D() {
-  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain, plan } = useApp()
   const sess = activeSession.image
   const [imgData, setImgData]   = useState(sess?.imageData || null)
   const [messages, setMessages] = useState(sess?.messages || [])
@@ -84,7 +84,8 @@ export default function ImageTo3D() {
     try {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
       const generate = aiBrain === 'gemini' ? geminiFromImage : claudeFromImage
-      const data = await generate(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus })
+      const variant = plan === 'free' ? 'flash' : 'pro'
+      const data = await generate(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus, variant })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',

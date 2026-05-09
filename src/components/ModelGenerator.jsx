@@ -21,7 +21,7 @@ const EXAMPLES = [
 ]
 
 export default function ModelGenerator() {
-  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang, aiBrain, plan } = useApp()
   const sess = activeSession.model
   const [messages, setMessages] = useState(sess?.messages || [])
   const [modelData, setModelData] = useState(sess?.modelData || null)
@@ -55,7 +55,8 @@ export default function ModelGenerator() {
     try {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
       const generate = aiBrain === 'gemini' ? geminiGenerate : claudeGenerate
-      const data = await generate(text, effective, { onStatus: setStatus })
+      const variant = plan === 'free' ? 'flash' : 'pro'
+      const data = await generate(text, effective, { onStatus: setStatus, variant })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',

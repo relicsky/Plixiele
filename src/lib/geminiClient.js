@@ -3,8 +3,14 @@ import { BABYLON_PROMPT } from './babylonPrompt.js'
 import { BLENDER_PROMPT } from './blenderPrompt.js'
 import { HLSL_PROMPT } from './hlslPrompt.js'
 
-const MODEL = 'gemini-2.5-flash'
-const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent`
+const MODELS = {
+  flash: 'gemini-2.5-flash',
+  pro:   'gemini-2.5-pro',
+}
+function endpointFor(variant) {
+  const id = MODELS[variant] || MODELS.flash
+  return `https://generativelanguage.googleapis.com/v1beta/models/${id}:streamGenerateContent`
+}
 
 function key() {
   const k = import.meta.env.VITE_GEMINI_API_KEY
@@ -19,13 +25,19 @@ function promptFor(renderer) {
   return SYSTEM_PROMPT
 }
 
-async function callGemini(systemText, userParts, onStatus) {
+async function callGemini(systemText, userParts, onStatus, variant = 'flash') {
   onStatus?.('loading')
-  const url = `${ENDPOINT}?alt=sse&key=${key()}`
+  const url = `${endpointFor(variant)}?alt=sse&key=${key()}`
   const body = {
     systemInstruction: { parts: [{ text: systemText }] },
     contents: [{ role: 'user', parts: userParts }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 24000 },
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 60000,
+      // Gemini 2.5 uses "thinking" by default which consumes the output budget.
+      // For structured JSON generation we want all tokens going to actual output.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   }
   const res = await fetch(url, {
     method: 'POST',
@@ -63,25 +75,25 @@ async function callGemini(systemText, userParts, onStatus) {
   return text
 }
 
-export async function generate3DModel(userPrompt, renderer = 'threejs', { onStatus } = {}) {
-  const text = await callGemini(promptFor(renderer), [{ text: `Create a 3D model: ${userPrompt}` }], onStatus)
+export async function generate3DModel(userPrompt, renderer = 'threejs', { onStatus, variant = 'flash' } = {}) {
+  const text = await callGemini(promptFor(renderer), [{ text: `Create a 3D model: ${userPrompt}` }], onStatus, variant)
   const data = parseJSON(text)
   data.timestamp = Date.now()
   data.renderer = renderer
-  data.brain = 'gemini'
+  data.brain = `gemini-${variant}`
   return data
 }
 
-export async function generate3DFromImage(base64, mimeType, userPrompt, renderer = 'threejs', { onStatus } = {}) {
+export async function generate3DFromImage(base64, mimeType, userPrompt, renderer = 'threejs', { onStatus, variant = 'flash' } = {}) {
   const parts = [
     { inlineData: { mimeType, data: base64 } },
     { text: userPrompt || 'Create a 3D model inspired by this image.' },
   ]
-  const text = await callGemini(promptFor(renderer), parts, onStatus)
+  const text = await callGemini(promptFor(renderer), parts, onStatus, variant)
   const data = parseJSON(text)
   data.timestamp = Date.now()
   data.renderer = renderer
-  data.brain = 'gemini'
+  data.brain = `gemini-${variant}`
   return data
 }
 
