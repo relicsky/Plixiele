@@ -85,7 +85,7 @@ export default function ImageTo3D() {
       const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
       const generate = aiBrain === 'gemini' ? geminiFromImage : claudeFromImage
       const variant = aiVariant || (aiBrain === 'gemini'
-        ? (plan === 'free' ? 'flash' : 'pro')
+        ? (plan === 'free' || plan === 'basic' ? 'flash' : 'pro')
         : (plan === 'premium' ? 'premium' : 'pro'))
       const data = await generate(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus, variant })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''

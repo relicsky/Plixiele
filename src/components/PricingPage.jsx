@@ -22,11 +22,11 @@ const TIERS = [
     key: 'basic',
     title: 'Basic',
     price: '$10',
-    blurb: 'Unlocks Labs and Gemini Pro.',
+    blurb: 'Unlocks Labs and 10× the credits.',
     credits: 600,
     features: [
       '60 generations / month (or 300 chats)',
-      'Gemini Pro',
+      'Gemini Flash',
       'Labs: Scene Builder + Shader Lab',
       'Publish to Community',
     ],
