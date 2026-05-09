@@ -52,7 +52,7 @@ async function _stream(messages, renderer, onStatus) {
   try {
     const stream = client().messages.stream({
       model: 'claude-opus-4-7',
-      max_tokens: 8000,
+      max_tokens: 24000,
       system: [{ type: 'text', text: promptFor(renderer), cache_control: { type: 'ephemeral' } }],
       messages,
     })
@@ -119,5 +119,11 @@ function parseJSON(text) {
   // Robust brace extraction
   const raw = extractJSON(text)
   if (raw) { const r = tryParse(raw); if (r) return r }
-  throw new Error('Could not parse model data from response. Try again.')
+  // Truncation: a JSON code block was opened but never closed
+  console.error('Claude response could not be parsed:\n', text)
+  if (/```(?:json)?\s*\{/.test(text || '') && !/```\s*$/.test((text || '').trimEnd())) {
+    throw new Error('Response was cut off before completing the model. Try a simpler prompt or increase max_tokens.')
+  }
+  const preview = (text || '').trim().slice(0, 240).replace(/\s+/g, ' ')
+  throw new Error(`Could not parse model data from response. Got: "${preview || '(empty)'}"`)
 }
