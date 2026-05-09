@@ -6,13 +6,21 @@ import * as F from '../lib/firestoreStore.js'
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
 
+// Plan → default AI brain. Free/Basic ride Gemini Flash; Pro/Premium ride Claude.
+// Users can still override via the toggle (kept visible during dev — see RendererSelect).
+function defaultBrainForPlan(plan) {
+  return plan === 'pro' || plan === 'premium' ? 'claude' : 'gemini'
+}
+
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
   const [mode, setMode]         = useState('model')
   const [renderer, setRenderer] = useState('threejs')
   const [shaderLang, setShaderLang] = useState('glsl')
-  const [aiBrain, setAiBrainState] = useState(() => localStorage.getItem('plixie_brain') || 'claude')
   const [plan, setPlanState] = useState(() => localStorage.getItem('plixie_plan') || 'free')
+  const [aiBrain, setAiBrainState] = useState(() =>
+    localStorage.getItem('plixie_brain') || defaultBrainForPlan(localStorage.getItem('plixie_plan') || 'free'),
+  )
   const setAiBrain = (b) => { localStorage.setItem('plixie_brain', b); setAiBrainState(b) }
   const setPlan    = (p) => { localStorage.setItem('plixie_plan', p);   setPlanState(p) }
   const [sessions, setSessions] = useState(() => S.getSessions())

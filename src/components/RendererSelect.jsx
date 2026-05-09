@@ -7,11 +7,15 @@ const OPTIONS = [
 ]
 
 const PRO_PLUS = new Set(['pro', 'premium'])
+// While we build out subscriptions the brain toggle stays visible to everyone
+// for development. Flip this to false (or remove the override) at launch and
+// the toggle will only render for Pro/Premium plans.
+const DEV_BRAIN_TOGGLE_FOR_ALL = true
 
 export default function RendererSelect() {
   const { renderer, setRenderer, shaderLang, setShaderLang, aiBrain, setAiBrain, plan } = useApp()
   const showShaderToggle = renderer !== 'blender'
-  const showBrainToggle = PRO_PLUS.has(plan)
+  const showBrainToggle = DEV_BRAIN_TOGGLE_FOR_ALL || PRO_PLUS.has(plan)
   return (
     <div className="renderer-row">
       <div className="renderer-select">
