@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import * as S from '../lib/storage.js'
-import { signOutUser, onAuthChange } from '../lib/firebaseAuth.js'
+import { signOutUser, onAuthChange, isFirebaseReady } from '../lib/firebaseAuth.js'
+import * as F from '../lib/firestoreStore.js'
 
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
@@ -15,15 +16,47 @@ export function AppProvider({ children }) {
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
   const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
 
+  const cloudUid = useMemo(
+    () => (isFirebaseReady() && user?.uid && !user.uid.startsWith('local_')) ? user.uid : null,
+    [user],
+  )
+
   // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthChange((firebaseUser) => {
       setUser(firebaseUser)
-      if (firebaseUser) {
+      if (!firebaseUser) {
         setSessions(S.getSessions())
+        setSavedScenes(S.getScenes())
       }
     })
     return unsubscribe
+  }, [])
+
+  // Subscribe to Firestore for the signed-in cloud user.
+  useEffect(() => {
+    if (!cloudUid) {
+      setSessions(S.getSessions())
+      setSavedScenes(S.getScenes())
+      return
+    }
+    F.migrateLocalToCloud(cloudUid, {
+      sessions: S.getSessions(),
+      scenes: S.getScenes(),
+      community: S.getCommunityPosts(),
+    }, user)
+    const unsubA = F.watchUserCollection(cloudUid, 'sessions', setSessions)
+    const unsubB = F.watchUserCollection(cloudUid, 'scenes', setSavedScenes)
+    return () => { unsubA(); unsubB() }
+  }, [cloudUid, user])
+
+  // Community feed — Firestore when available, localStorage otherwise.
+  useEffect(() => {
+    if (!isFirebaseReady()) {
+      setCommunityPosts(S.getCommunityPosts())
+      return
+    }
+    return F.watchCommunity(setCommunityPosts)
   }, [])
 
   async function handleSignOut() {
@@ -44,28 +77,45 @@ export function AppProvider({ children }) {
       messages: [], modelData: null, imageData: null,
       createdAt: Date.now(), updatedAt: Date.now(),
     }
-    S.saveSession(sess)
-    setSessions(S.getSessions())
+    if (cloudUid) {
+      F.saveUserDoc(cloudUid, 'sessions', sess)
+      setSessions(prev => [sess, ...prev.filter(s => s.id !== sess.id)])
+    } else {
+      S.saveSession(sess)
+      setSessions(S.getSessions())
+    }
     setActiveId(p => ({ ...p, [m]: sess.id }))
     return sess
-  }, [])
+  }, [cloudUid])
 
   const updateSession = useCallback((id, patch) => {
-    const all = S.getSessions()
-    const sess = { ...(all.find(s => s.id === id) || {}), ...patch, updatedAt: Date.now() }
-    S.saveSession(sess)
-    setSessions(S.getSessions())
-  }, [])
+    if (cloudUid) {
+      const existing = sessions.find(s => s.id === id) || {}
+      const sess = { ...existing, ...patch, id, updatedAt: Date.now() }
+      F.saveUserDoc(cloudUid, 'sessions', sess)
+      setSessions(prev => prev.map(s => s.id === id ? sess : s))
+    } else {
+      const all = S.getSessions()
+      const sess = { ...(all.find(s => s.id === id) || {}), ...patch, updatedAt: Date.now() }
+      S.saveSession(sess)
+      setSessions(S.getSessions())
+    }
+  }, [cloudUid, sessions])
 
   const removeSession = useCallback((id) => {
-    S.deleteSession(id)
-    setSessions(S.getSessions())
+    if (cloudUid) {
+      F.deleteUserDoc(cloudUid, 'sessions', id)
+      setSessions(prev => prev.filter(s => s.id !== id))
+    } else {
+      S.deleteSession(id)
+      setSessions(S.getSessions())
+    }
     setActiveId(p => {
       const n = { ...p }
       for (const k of Object.keys(n)) if (n[k] === id) n[k] = null
       return n
     })
-  }, [])
+  }, [cloudUid])
 
   const loadSession = useCallback((sess) => {
     setMode(sess.mode)
@@ -82,14 +132,22 @@ export function AppProvider({ children }) {
       author: post.author || user?.name || 'You',
       createdAt: post.createdAt || Date.now(),
     }
-    S.saveCommunityPost(full)
-    setCommunityPosts(S.getCommunityPosts())
+    if (isFirebaseReady()) {
+      F.publishCommunity(full, user)
+    } else {
+      S.saveCommunityPost(full)
+      setCommunityPosts(S.getCommunityPosts())
+    }
     return full
   }, [user])
 
   const unpublishCommunity = useCallback((id) => {
-    S.deleteCommunityPost(id)
-    setCommunityPosts(S.getCommunityPosts())
+    if (isFirebaseReady()) {
+      F.unpublishCommunity(id)
+    } else {
+      S.deleteCommunityPost(id)
+      setCommunityPosts(S.getCommunityPosts())
+    }
   }, [])
 
   const persistScene = useCallback((scene) => {
@@ -102,15 +160,29 @@ export function AppProvider({ children }) {
       createdAt: scene.createdAt || Date.now(),
       updatedAt: Date.now(),
     }
-    S.saveScene(full)
-    setSavedScenes(S.getScenes())
+    if (cloudUid) {
+      F.saveUserDoc(cloudUid, 'scenes', full)
+      setSavedScenes(prev => {
+        const idx = prev.findIndex(s => s.id === full.id)
+        if (idx >= 0) { const next = [...prev]; next[idx] = full; return next }
+        return [full, ...prev]
+      })
+    } else {
+      S.saveScene(full)
+      setSavedScenes(S.getScenes())
+    }
     return full
-  }, [])
+  }, [cloudUid])
 
   const removeScene = useCallback((id) => {
-    S.deleteScene(id)
-    setSavedScenes(S.getScenes())
-  }, [])
+    if (cloudUid) {
+      F.deleteUserDoc(cloudUid, 'scenes', id)
+      setSavedScenes(prev => prev.filter(s => s.id !== id))
+    } else {
+      S.deleteScene(id)
+      setSavedScenes(S.getScenes())
+    }
+  }, [cloudUid])
 
   const activeSession = {
     model: sessions.find(s => s.id === activeId.model) || null,

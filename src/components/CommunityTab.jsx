@@ -132,21 +132,30 @@ function ModelCard({ model, isUserPost, onDelete }) {
 }
 
 export default function CommunityTab() {
-  const { communityPosts, unpublishCommunity } = useApp()
+  const { user, communityPosts, unpublishCommunity } = useApp()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
 
   const all = useMemo(() => {
-    const userPosts = communityPosts.map(p => ({ ...p, _user: true }))
-    const featured = COMMUNITY_MODELS.map(m => ({ ...m, _user: false }))
+    const myUid = user?.uid
+    const userPosts = communityPosts.map(p => ({
+      ...p,
+      _community: true,
+      _mine: !!p.authorUid ? p.authorUid === myUid : true,
+    }))
+    const featured = COMMUNITY_MODELS.map(m => ({ ...m, _community: false, _mine: false }))
     return [...userPosts, ...featured]
-  }, [communityPosts])
+  }, [communityPosts, user])
+
+  const myCount = all.filter(m => m._mine).length
+  const communityCount = all.filter(m => m._community).length
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return all.filter(m => {
-      if (filter === 'yours' && !m._user) return false
-      if (filter === 'featured' && m._user) return false
+      if (filter === 'yours' && !m._mine) return false
+      if (filter === 'community' && !m._community) return false
+      if (filter === 'featured' && m._community) return false
       if (!q) return true
       return (
         m.title.toLowerCase().includes(q) ||
@@ -174,8 +183,11 @@ export default function CommunityTab() {
         <button className={`community-filter${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>
           All <span>{all.length}</span>
         </button>
+        <button className={`community-filter${filter === 'community' ? ' active' : ''}`} onClick={() => setFilter('community')}>
+          Community <span>{communityCount}</span>
+        </button>
         <button className={`community-filter${filter === 'yours' ? ' active' : ''}`} onClick={() => setFilter('yours')}>
-          Yours <span>{communityPosts.length}</span>
+          Yours <span>{myCount}</span>
         </button>
         <button className={`community-filter${filter === 'featured' ? ' active' : ''}`} onClick={() => setFilter('featured')}>
           Featured <span>{COMMUNITY_MODELS.length}</span>
@@ -183,7 +195,7 @@ export default function CommunityTab() {
       </div>
       <div className="community-grid">
         {filtered.map(m => (
-          <ModelCard key={m.id} model={m} isUserPost={m._user}
+          <ModelCard key={m.id} model={m} isUserPost={m._mine}
             onDelete={unpublishCommunity} />
         ))}
         {filtered.length === 0 && (
