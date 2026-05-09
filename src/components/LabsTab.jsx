@@ -4,6 +4,7 @@ import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
+import SceneBuilder from './SceneBuilder.jsx'
 
 // ── shader re-use helper ──
 const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -129,6 +130,23 @@ function UniformControl({ name, def, onChange }) {
 
 // ── Main Labs component ──
 export default function LabsTab() {
+  const [labTab, setLabTab] = useState('scene')
+  return (
+    <div className="labs-shell">
+      <div className="labs-tabbar">
+        <button className={`labs-tabbar-btn${labTab === 'scene' ? ' active' : ''}`} onClick={() => setLabTab('scene')}>
+          ⊞ Scene Builder
+        </button>
+        <button className={`labs-tabbar-btn${labTab === 'shader' ? ' active' : ''}`} onClick={() => setLabTab('shader')}>
+          ⚗ Shader Lab
+        </button>
+      </div>
+      {labTab === 'scene' ? <SceneBuilder /> : <ShaderLab />}
+    </div>
+  )
+}
+
+function ShaderLab() {
   const { sessions } = useApp()
   const [model, setModel] = useState(null)
   const [editedModel, setEditedModel] = useState(null)

@@ -10,6 +10,8 @@ export function AppProvider({ children }) {
   const [renderer, setRenderer] = useState('threejs')
   const [sessions, setSessions] = useState(() => S.getSessions())
   const [activeId, setActiveId] = useState({ model: null, image: null, code: null })
+  const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
+  const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
 
   function signIn(name, email) {
     const u = { name, email, createdAt: Date.now() }
@@ -59,6 +61,46 @@ export function AppProvider({ children }) {
     setActiveId(p => ({ ...p, [sess.mode]: sess.id }))
   }, [])
 
+  const publishToCommunity = useCallback((post) => {
+    const full = {
+      id: post.id || S.newId(),
+      title: post.title || 'Untitled',
+      tags: post.tags || [],
+      thumb: post.thumb || ['#1a0a4a', '#7cf'],
+      modelData: post.modelData,
+      author: post.author || user?.name || 'You',
+      createdAt: post.createdAt || Date.now(),
+    }
+    S.saveCommunityPost(full)
+    setCommunityPosts(S.getCommunityPosts())
+    return full
+  }, [user])
+
+  const unpublishCommunity = useCallback((id) => {
+    S.deleteCommunityPost(id)
+    setCommunityPosts(S.getCommunityPosts())
+  }, [])
+
+  const persistScene = useCallback((scene) => {
+    const full = {
+      id: scene.id || S.newId(),
+      title: scene.title || 'Untitled scene',
+      items: scene.items || [],
+      background: scene.background || '#04040e',
+      prompt: scene.prompt || '',
+      createdAt: scene.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    }
+    S.saveScene(full)
+    setSavedScenes(S.getScenes())
+    return full
+  }, [])
+
+  const removeScene = useCallback((id) => {
+    S.deleteScene(id)
+    setSavedScenes(S.getScenes())
+  }, [])
+
   const activeSession = {
     model: sessions.find(s => s.id === activeId.model) || null,
     image: sessions.find(s => s.id === activeId.image) || null,
@@ -72,6 +114,8 @@ export function AppProvider({ children }) {
       renderer, setRenderer,
       sessions, activeSession, activeId,
       createSession, updateSession, removeSession, loadSession,
+      communityPosts, publishToCommunity, unpublishCommunity,
+      savedScenes, persistScene, removeScene,
     }}>
       {children}
     </Ctx.Provider>

@@ -1,4 +1,9 @@
-const KEYS = { USER: 'plixie_user', SESSIONS: 'plixie_sessions' }
+const KEYS = {
+  USER: 'plixie_user',
+  SESSIONS: 'plixie_sessions',
+  COMMUNITY: 'plixie_community_posts',
+  SCENES: 'plixie_saved_scenes',
+}
 
 function read(key, fallback = null) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback }
@@ -30,4 +35,34 @@ export function deleteSession(id) {
 
 export function newId() {
   return `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+// Community posts (local only — no backend)
+export const getCommunityPosts = () => read(KEYS.COMMUNITY, [])
+
+export function saveCommunityPost(post) {
+  const all = getCommunityPosts()
+  const idx = all.findIndex(p => p.id === post.id)
+  if (idx >= 0) all[idx] = post
+  else all.unshift(post)
+  write(KEYS.COMMUNITY, all)
+}
+
+export function deleteCommunityPost(id) {
+  write(KEYS.COMMUNITY, getCommunityPosts().filter(p => p.id !== id))
+}
+
+// Saved scenes (Labs Scene Builder)
+export const getScenes = () => read(KEYS.SCENES, [])
+
+export function saveScene(scene) {
+  const all = getScenes()
+  const idx = all.findIndex(s => s.id === scene.id)
+  if (idx >= 0) all[idx] = scene
+  else all.unshift(scene)
+  write(KEYS.SCENES, all)
+}
+
+export function deleteScene(id) {
+  write(KEYS.SCENES, getScenes().filter(s => s.id !== id))
 }

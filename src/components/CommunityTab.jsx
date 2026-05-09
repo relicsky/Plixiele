@@ -56,7 +56,7 @@ function MiniViewer({ modelData }) {
   )
 }
 
-function ModelCard({ model }) {
+function ModelCard({ model, isUserPost, onDelete }) {
   const [hovered, setHovered] = useState(false)
   const { setMode, createSession, updateSession } = useApp()
 
@@ -82,6 +82,7 @@ function ModelCard({ model }) {
             {model.modelData.parts ? `${model.modelData.parts.length}P` : '3D'}
           </div>
         )}
+        {isUserPost && <span className="card-badge">Yours</span>}
       </div>
       <div className="card-body">
         <div className="card-title">{model.title}</div>
@@ -90,7 +91,13 @@ function ModelCard({ model }) {
           <div className="card-tags">
             {model.tags.map(t => <span key={t} className="card-tag">{t}</span>)}
           </div>
-          <button className="card-load" onClick={loadModel}>Load →</button>
+          <div className="card-actions">
+            {isUserPost && (
+              <button className="card-del" title="Unpublish"
+                onClick={() => onDelete?.(model.id)}>×</button>
+            )}
+            <button className="card-load" onClick={loadModel}>Load →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -98,24 +105,36 @@ function ModelCard({ model }) {
 }
 
 export default function CommunityTab() {
+  const { communityPosts, unpublishCommunity } = useApp()
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  const all = useMemo(() => {
+    const userPosts = communityPosts.map(p => ({ ...p, _user: true }))
+    const featured = COMMUNITY_MODELS.map(m => ({ ...m, _user: false }))
+    return [...userPosts, ...featured]
+  }, [communityPosts])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    if (!q) return COMMUNITY_MODELS
-    return COMMUNITY_MODELS.filter(m =>
-      m.title.toLowerCase().includes(q) ||
-      m.tags.some(t => t.includes(q)) ||
-      m.modelData.description.toLowerCase().includes(q)
-    )
-  }, [search])
+    return all.filter(m => {
+      if (filter === 'yours' && !m._user) return false
+      if (filter === 'featured' && m._user) return false
+      if (!q) return true
+      return (
+        m.title.toLowerCase().includes(q) ||
+        (m.tags || []).some(t => t.toLowerCase().includes(q)) ||
+        (m.modelData.description || '').toLowerCase().includes(q)
+      )
+    })
+  }, [all, search, filter])
 
   return (
     <div className="community">
       <div className="community-header">
         <div>
           <h2 className="community-title">Community Gallery</h2>
-          <p className="community-sub">Featured shader models — hover to preview, click Load to edit</p>
+          <p className="community-sub">Featured shader models — hover to preview, click Load to edit. Publish your own from the model viewer.</p>
         </div>
         <input
           className="community-search"
@@ -124,10 +143,28 @@ export default function CommunityTab() {
           onChange={e => setSearch(e.target.value)}
         />
       </div>
+      <div className="community-filterbar">
+        <button className={`community-filter${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>
+          All <span>{all.length}</span>
+        </button>
+        <button className={`community-filter${filter === 'yours' ? ' active' : ''}`} onClick={() => setFilter('yours')}>
+          Yours <span>{communityPosts.length}</span>
+        </button>
+        <button className={`community-filter${filter === 'featured' ? ' active' : ''}`} onClick={() => setFilter('featured')}>
+          Featured <span>{COMMUNITY_MODELS.length}</span>
+        </button>
+      </div>
       <div className="community-grid">
-        {filtered.map(m => <ModelCard key={m.id} model={m} />)}
+        {filtered.map(m => (
+          <ModelCard key={m.id} model={m} isUserPost={m._user}
+            onDelete={unpublishCommunity} />
+        ))}
         {filtered.length === 0 && (
-          <p className="community-empty">No models match "{search}"</p>
+          <p className="community-empty">
+            {filter === 'yours'
+              ? 'You haven\'t published any models yet. Generate one and click Publish.'
+              : `No models match "${search}"`}
+          </p>
         )}
       </div>
     </div>

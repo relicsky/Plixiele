@@ -72,16 +72,6 @@ export default function Sidebar() {
         )}
       </div>
 
-      <a
-        href="/plixie-engine.html"
-        download="plix-studio.html"
-        className="engine-link"
-      >
-        <span className="engine-link-icon">⬡</span>
-        <span>Plix Studio</span>
-        <span className="engine-link-arrow">↗</span>
-      </a>
-
       <div className="sidebar-user">
         <div className="user-avatar">{initials(user?.name)}</div>
         <div className="user-info">

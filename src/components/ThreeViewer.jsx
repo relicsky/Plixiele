@@ -2,6 +2,8 @@ import { useRef, useMemo, useState, useEffect, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
+import { downloadModelGLB } from '../lib/exportGLB.js'
+import PublishDialog from './PublishDialog.jsx'
 
 const DEFAULT_VERT = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
 void main(){vUv=uv;vNormal=normalize(normalMatrix*normal);vPosition=position;vWorldPosition=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`
@@ -138,6 +140,8 @@ export default function ThreeViewer({ modelData, isGenerating }) {
   const [wireframe, setWireframe] = useState(false)
   const [showDl, setShowDl] = useState(false)
   const [threeCtx, setThreeCtx] = useState(null)
+  const [publishOpen, setPublishOpen] = useState(false)
+  const [justPublished, setJustPublished] = useState(false)
 
   function downloadPNG() {
     setShowDl(false)
@@ -149,16 +153,11 @@ export default function ThreeViewer({ modelData, isGenerating }) {
     a.click()
   }
 
-  function downloadJSON() {
+  async function downloadGLB() {
     setShowDl(false)
     if (!modelData) return
-    const { timestamp, renderer, ...clean } = modelData
-    const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.download = 'plixie-model.json'
-    a.href = URL.createObjectURL(blob)
-    a.click()
-    URL.revokeObjectURL(a.href)
+    try { await downloadModelGLB(modelData, 'plixie-model.glb') }
+    catch (e) { console.error('GLB export failed', e) }
   }
 
   return (
@@ -169,17 +168,22 @@ export default function ThreeViewer({ modelData, isGenerating }) {
         </button>
 
         {modelData && (
-          <div className="dl-wrap" onClick={e => e.stopPropagation()}>
-            <button className="viewer-btn viewer-btn-accent" onClick={() => setShowDl(d => !d)}>
-              ↓ Download
+          <>
+            <div className="dl-wrap" onClick={e => e.stopPropagation()}>
+              <button className="viewer-btn viewer-btn-accent" onClick={() => setShowDl(d => !d)}>
+                ↓ Download
+              </button>
+              {showDl && (
+                <div className="dl-dropdown">
+                  <button onClick={downloadPNG}>📷 PNG Screenshot</button>
+                  <button onClick={downloadGLB}>📦 GLB (3D Model)</button>
+                </div>
+              )}
+            </div>
+            <button className="viewer-btn" onClick={() => setPublishOpen(true)} disabled={justPublished}>
+              {justPublished ? '✓ Published' : '⇧ Publish'}
             </button>
-            {showDl && (
-              <div className="dl-dropdown">
-                <button onClick={downloadPNG}>📷 PNG Screenshot</button>
-                <button onClick={downloadJSON}>💾 JSON Config</button>
-              </div>
-            )}
-          </div>
+          </>
         )}
 
         {modelData?.description && (
@@ -216,6 +220,16 @@ export default function ThreeViewer({ modelData, isGenerating }) {
         <OrbitControls enableDamping dampingFactor={0.06} />
         <ContextBridge onReady={setThreeCtx} />
       </Canvas>
+      {publishOpen && (
+        <PublishDialog modelData={modelData}
+          onClose={(ok) => {
+            setPublishOpen(false)
+            if (ok) {
+              setJustPublished(true)
+              setTimeout(() => setJustPublished(false), 2200)
+            }
+          }} />
+      )}
     </div>
   )
 }
