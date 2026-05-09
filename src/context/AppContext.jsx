@@ -8,6 +8,7 @@ export function AppProvider({ children }) {
   const [user, setUser]         = useState(() => S.getUser())
   const [mode, setMode]         = useState('model')
   const [renderer, setRenderer] = useState('threejs')
+  const [shaderLang, setShaderLang] = useState('glsl')
   const [sessions, setSessions] = useState(() => S.getSessions())
   const [activeId, setActiveId] = useState({ model: null, image: null, code: null })
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
@@ -112,6 +113,7 @@ export function AppProvider({ children }) {
       user, signIn, signOut,
       mode, setMode,
       renderer, setRenderer,
+      shaderLang, setShaderLang,
       sessions, activeSession, activeId,
       createSession, updateSession, removeSession, loadSession,
       communityPosts, publishToCommunity, unpublishCommunity,

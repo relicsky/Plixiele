@@ -19,7 +19,7 @@ const EXAMPLES = [
 ]
 
 export default function ModelGenerator() {
-  const { activeSession, createSession, updateSession, renderer } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang } = useApp()
   const sess = activeSession.model
   const [messages, setMessages] = useState(sess?.messages || [])
   const [modelData, setModelData] = useState(sess?.modelData || null)
@@ -51,7 +51,8 @@ export default function ModelGenerator() {
     if (!s) { s = createSession('model'); sessRef.current = s }
 
     try {
-      const data = await generate3DModel(text, renderer, { onStatus: setStatus })
+      const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
+      const data = await generate3DModel(text, effective, { onStatus: setStatus })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',
@@ -73,7 +74,7 @@ export default function ModelGenerator() {
     }
   }
 
-  const is3D = renderer === 'threejs'
+  const is3D = renderer === 'threejs' && shaderLang === 'glsl'
 
   return (
     <div className="mode-3d">

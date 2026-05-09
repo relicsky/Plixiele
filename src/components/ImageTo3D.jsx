@@ -38,7 +38,7 @@ function resizeImage(file, maxPx = 768) {
 }
 
 export default function ImageTo3D() {
-  const { activeSession, createSession, updateSession, renderer } = useApp()
+  const { activeSession, createSession, updateSession, renderer, shaderLang } = useApp()
   const sess = activeSession.image
   const [imgData, setImgData]   = useState(sess?.imageData || null)
   const [messages, setMessages] = useState(sess?.messages || [])
@@ -80,7 +80,8 @@ export default function ImageTo3D() {
     if (!s) { s = createSession('image'); sessRef.current = s }
 
     try {
-      const data = await generate3DFromImage(imgData.base64, imgData.mimeType, prompt, renderer, { onStatus: setStatus })
+      const effective = shaderLang === 'hlsl' && renderer !== 'blender' ? 'hlsl' : renderer
+      const data = await generate3DFromImage(imgData.base64, imgData.mimeType, prompt, effective, { onStatus: setStatus })
       const partsInfo = data.parts ? ` (${data.parts.length} parts)` : ''
       const aMsg = {
         role: 'assistant',
@@ -99,7 +100,7 @@ export default function ImageTo3D() {
     }
   }
 
-  const is3D = renderer === 'threejs'
+  const is3D = renderer === 'threejs' && shaderLang === 'glsl'
 
   return (
     <div className="mode-3d">

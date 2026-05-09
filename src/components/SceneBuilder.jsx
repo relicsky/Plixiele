@@ -173,6 +173,18 @@ function NumRow({ label, values, onChange, step = 0.1 }) {
 let _idc = 0
 const newId = () => `it_${Date.now().toString(36)}_${(_idc++).toString(36)}`
 
+const AUTO_PROMPTS = [
+  'an ancient mystical forest with floating crystals, ruins, and glowing artifacts',
+  'a cosmic shrine on a windswept mesa with crystals, pillars, and orbiting motes',
+  'a surreal alien garden of bioluminescent flora and twisted obelisks',
+  'a celestial observatory with telescopes, glowing orbs, and runic monoliths',
+  'a sunken cavern altar with crystals, broken statues, and deep pools of light',
+  'a cyberpunk plaza with monoliths, holograms, and abstract neon sculptures',
+  'a high-fantasy hilltop with crystal trees, runestones, and a centerpiece spire',
+  'a dreamlike floating archipelago with arches, lanterns, and tall standing stones',
+]
+const pickPrompt = () => AUTO_PROMPTS[Math.floor(Math.random() * AUTO_PROMPTS.length)]
+
 function spreadPosition(i) {
   const cols = 4
   const x = ((i % cols) - cols / 2 + 0.5) * 3
@@ -352,12 +364,12 @@ export default function SceneBuilder() {
     setError('')
   }
 
-  async function runGenerate() {
-    if (!prompt.trim()) return
+  async function runGenerateWith(thePrompt, withTerrain) {
+    if (!thePrompt.trim()) return
     setBusy(true)
     setError('')
     try {
-      const data = await generateScene(prompt, fullLib, { terrain })
+      const data = await generateScene(thePrompt, fullLib, { terrain: withTerrain })
       const next = (data.items || []).map((it, i) => {
         const lib = libById[it.ref]
         if (!lib) return null
@@ -372,7 +384,7 @@ export default function SceneBuilder() {
           ref: it.ref,
           label: lib.title,
           modelData: lib.modelData,
-          position: terrain ? snapToTerrain(rawPos, scaleArr) : rawPos,
+          position: withTerrain ? snapToTerrainXZ(rawPos, scaleArr) : rawPos,
           rotation: it.rotation || [0, 0, 0],
           scale: scaleArr,
         }
@@ -386,6 +398,23 @@ export default function SceneBuilder() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function snapToTerrainXZ(pos, scale) {
+    const [x, , z] = pos
+    const sy = Array.isArray(scale) ? scale[1] : scale
+    return [x, terrainHeight(x, z) + 0.5 * sy, z]
+  }
+
+  async function runGenerate() {
+    return runGenerateWith(prompt, terrain)
+  }
+
+  async function runAutoBuild() {
+    const themed = pickPrompt()
+    setPrompt(themed)
+    if (!terrain) setTerrain(true)
+    return runGenerateWith(themed, true)
   }
 
   async function runDownloadGLB() {
@@ -475,16 +504,21 @@ export default function SceneBuilder() {
         </div>
 
         <div className="scene-section">
-          <div className="scene-section-title">Generate from prompt</div>
+          <div className="scene-section-title">Generate</div>
+          <button className="scene-btn build" onClick={runAutoBuild} disabled={busy}
+            title="Pick a random theme, enable terrain, build a beautiful scene">
+            {busy ? 'Building…' : '🏗 Build Scene'}
+          </button>
+          <p className="scene-hint">One click — random theme, terrain on, AI composes a scene from your library.</p>
           <textarea
             className="scene-prompt"
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            placeholder="A floating crystal garden with abstract sculptures…"
+            placeholder="Or describe your own: a floating crystal garden…"
             rows={2}
           />
           <button className="scene-btn primary" onClick={runGenerate} disabled={busy}>
-            {busy ? 'Generating…' : '✨ Generate'}
+            {busy ? 'Generating…' : '✨ Generate from prompt'}
           </button>
           {error && <p className="scene-error">{error}</p>}
         </div>
@@ -580,7 +614,10 @@ export default function SceneBuilder() {
 
         {selected && (
           <div className="scene-section">
-            <div className="scene-section-title">Transform: {selected.label}</div>
+            <div className="scene-section-title scene-transform-title">
+              <span>Transform</span>
+              <span className="scene-transform-label" title={selected.label}>{selected.label}</span>
+            </div>
             <NumRow label="Pos" values={selected.position}
               onChange={v => patchItem(selected.id, { position: v })} />
             <NumRow label="Rot" values={selected.rotation} step={0.05}
