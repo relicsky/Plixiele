@@ -119,11 +119,12 @@
    COMMUNITY TAB
 ════════════════════════════════════════ */
 .community {
-  display: flex; flex-direction: column; height: 100%; overflow: hidden;
+  display: flex; flex-direction: column; height: 100%;
+  overflow-y: auto;
 }
 .community-header {
   display: flex; align-items: flex-end; justify-content: space-between;
-  padding: 24px 28px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 20px;
+  padding: 24px 28px 18px; border-bottom: 1px solid var(--border); gap: 20px;
 }
 .community-title { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
 .community-sub   { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
@@ -136,9 +137,8 @@
 .community-search::placeholder { color: var(--text-3); }
 
 .community-grid {
-  flex: 1; overflow-y: auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px; padding: 20px 28px; align-content: start;
+  gap: 16px; padding: 20px 28px 32px; align-content: start;
 }
 .community-empty { color: var(--text-3); font-size: 13px; grid-column: 1/-1; padding: 20px 0; }
 
