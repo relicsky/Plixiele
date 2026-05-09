@@ -23,7 +23,7 @@ function initials(name = '') {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   const { user, signOut, mode, setMode, sessions, activeId, createSession, removeSession, loadSession } = useApp()
   const modeSessions = sessions.filter(s => s.mode === mode)
 
@@ -33,6 +33,9 @@ export default function Sidebar() {
         <div className="sidebar-logo">
           <span className="sidebar-logo-icon">✦</span>
           <span className="sidebar-logo-text">Plixie</span>
+          {onClose && (
+            <button className="sidebar-collapse" onClick={onClose} title="Hide sidebar">‹</button>
+          )}
         </div>
 
         <nav className="sidebar-nav">

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useApp } from './context/AppContext.jsx'
 import LoginPage from './components/LoginPage.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -10,10 +11,16 @@ import './App.css'
 
 function Shell() {
   const { mode } = useApp()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   return (
-    <div className="shell">
-      <Sidebar />
+    <div className={`shell${sidebarOpen ? '' : ' shell-collapsed'}`}>
+      <Sidebar onClose={() => setSidebarOpen(false)} />
       <main className="main">
+        {!sidebarOpen && (
+          <button className="sidebar-reopen" onClick={() => setSidebarOpen(true)} title="Show sidebar">
+            ☰
+          </button>
+        )}
         {mode === 'model'     && <ModelGenerator />}
         {mode === 'image'     && <ImageTo3D />}
         {mode === 'code'      && <CodingBuddy />}
