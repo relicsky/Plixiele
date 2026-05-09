@@ -9,6 +9,7 @@ import CommunityTab from './components/CommunityTab.jsx'
 import LabsTab from './components/LabsTab.jsx'
 import PricingPage from './components/PricingPage.jsx'
 import LegalPage from './components/LegalPage.jsx'
+import VerifyBanner from './components/VerifyBanner.jsx'
 import './App.css'
 
 function Shell() {
@@ -28,6 +29,7 @@ function Shell() {
         onOpenLegal={(which) => openOverlay(which)}
       />
       <main className="main">
+        <VerifyBanner />
         {!sidebarOpen && (
           <button className="sidebar-reopen" onClick={() => setSidebarOpen(true)} title="Show sidebar">
             ☰

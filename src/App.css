@@ -1855,3 +1855,44 @@
 .legal-body article ul { padding-left: 22px; }
 .legal-body article a { color: var(--accent2); }
 
+/* Forgot-password row + verify banner */
+.login-forgot-row {
+  display: flex; justify-content: center; align-items: center;
+  margin-top: 12px; min-height: 22px;
+}
+.login-forgot {
+  background: none; border: none; color: var(--text-3);
+  font-size: 12.5px; cursor: pointer; padding: 4px 8px;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.login-forgot:hover:not(:disabled) { color: var(--accent2); }
+.login-forgot:disabled { opacity: .5; cursor: not-allowed; }
+.login-forgot-sent { color: #7cffa8; font-size: 12.5px; }
+
+.verify-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: rgba(34,211,238,.1);
+  border-bottom: 1px solid rgba(34,211,238,.3);
+  color: var(--text);
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+.verify-banner-icon { font-size: 16px; color: var(--accent2); }
+.verify-banner-text { flex: 1; line-height: 1.4; }
+.verify-banner-action {
+  background: var(--accent2); color: #04141a; border: none;
+  padding: 6px 12px; border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: opacity .12s;
+}
+.verify-banner-action:hover:not(:disabled) { opacity: .9; }
+.verify-banner-action:disabled { opacity: .5; cursor: not-allowed; }
+.verify-banner-sent { color: #7cffa8; font-weight: 600; font-size: 12px; }
+.verify-banner-error { color: var(--error); font-size: 11.5px; }
+.verify-banner-close {
+  background: none; border: none; color: var(--text-3);
+  font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.verify-banner-close:hover { color: var(--text); }
+

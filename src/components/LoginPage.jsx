@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-import { createAccount, signInUser, isFirebaseReady } from '../lib/firebaseAuth.js'
+import { createAccount, signInUser, requestPasswordReset, isFirebaseReady } from '../lib/firebaseAuth.js'
 
 export default function LoginPage() {
   const { setUser } = useApp()
@@ -10,6 +10,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  async function forgotPassword() {
+    setErr('')
+    if (!email.includes('@')) {
+      setErr('Enter your email above first, then click "Forgot password".')
+      return
+    }
+    setResetting(true)
+    try {
+      await requestPasswordReset(email.trim().toLowerCase())
+      setResetSent(true)
+    } catch (e) {
+      setErr(e.message || 'Could not send reset email.')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -138,15 +157,31 @@ export default function LoginPage() {
             </p>
           )}
           
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="login-btn"
             disabled={isLoading || !email || !password}
             aria-busy={isLoading}
           >
-            {isLoading ? 'Loading...' : (tab === 'in' ? 'Sign in' : 'Create account')} 
+            {isLoading ? 'Loading...' : (tab === 'in' ? 'Sign in' : 'Create account')}
             {!isLoading && '→'}
           </button>
+
+          {tab === 'in' && (
+            <div className="login-forgot-row">
+              {resetSent ? (
+                <span className="login-forgot-sent">✓ Password reset email sent</span>
+              ) : (
+                <button
+                  type="button"
+                  className="login-forgot"
+                  onClick={forgotPassword}
+                  disabled={resetting || !email}>
+                  {resetting ? 'Sending…' : 'Forgot password?'}
+                </button>
+              )}
+            </div>
+          )}
         </form>
 
         <p className="login-note">

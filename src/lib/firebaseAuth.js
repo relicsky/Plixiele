@@ -2,6 +2,8 @@ import { auth, db, isFirebaseConfigured } from './firebase.js'
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
@@ -62,10 +64,16 @@ export async function createAccount(email, password, displayName) {
       updatedAt: serverTimestamp(),
     })
 
+    // Send email verification — non-blocking; failures don't abort signup.
+    sendEmailVerification(user).catch((e) => {
+      console.warn('Failed to send verification email:', e.message)
+    })
+
     return {
       uid: user.uid,
       email: user.email,
       name: displayName,
+      emailVerified: user.emailVerified,
     }
   } catch (error) {
     throw new Error(formatFirebaseError(error))
@@ -93,7 +101,36 @@ export async function signInUser(email, password) {
       uid: user.uid,
       email: user.email,
       name: userData.name || email.split('@')[0],
+      emailVerified: user.emailVerified,
     }
+  } catch (error) {
+    throw new Error(formatFirebaseError(error))
+  }
+}
+
+/**
+ * Send a password-reset email
+ */
+export async function requestPasswordReset(email) {
+  if (!isFirebaseReady()) {
+    throw new Error('Password reset requires Firebase. Configure it in .env.')
+  }
+  try {
+    await sendPasswordResetEmail(auth, email)
+  } catch (error) {
+    throw new Error(formatFirebaseError(error))
+  }
+}
+
+/**
+ * Re-send the email verification link to the currently signed-in user
+ */
+export async function resendEmailVerification() {
+  if (!isFirebaseReady() || !auth.currentUser) {
+    throw new Error('You must be signed in to resend verification.')
+  }
+  try {
+    await sendEmailVerification(auth.currentUser)
   } catch (error) {
     throw new Error(formatFirebaseError(error))
   }
@@ -141,6 +178,7 @@ export function onAuthChange(callback) {
         uid: user.uid,
         email: user.email,
         name: userData.name || user.email.split('@')[0],
+        emailVerified: user.emailVerified,
       })
     } else {
       callback(null)
