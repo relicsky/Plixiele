@@ -73,13 +73,6 @@ export default function HomePage({ onOpenHelp }) {
   // 4 community posts, deterministically rotated daily.
   const dailyPicks = useMemo(() => pickDaily(communityPosts, 4), [communityPosts])
 
-  // Featured = 4 most recent community posts (1 big + 3 small layout).
-  const featured = useMemo(() => {
-    return [...(communityPosts || [])]
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      .slice(0, 4)
-  }, [communityPosts])
-
   return (
     <div className="home-page">
       {/* Hero */}
@@ -159,58 +152,6 @@ export default function HomePage({ onOpenHelp }) {
         </section>
       )}
 
-      {/* Featured — 1 big card on the left + 3 small cards stacked on the right */}
-      {featured.length > 0 && (
-        <section className="home-section">
-          <div className="home-section-head">
-            <h2 className="home-section-title">Featured from Community</h2>
-            <button className="home-section-link" onClick={() => setMode('community')}>
-              View all
-            </button>
-          </div>
-          <div className="home-featured-split">
-            {(() => {
-              const [big, ...rest] = featured
-              const bigThumb = Array.isArray(big.thumb) ? big.thumb : ['#1a0a4a', '#7cf']
-              return (
-                <>
-                  <button className="home-featured-card-big" onClick={() => setMode('community')}>
-                    <div className="home-featured-big-thumb">
-                      <ModelSnapshot modelData={big.modelData} fallbackColors={bigThumb} />
-                      <span className="home-featured-badge">
-                        {big.modelData?.parts ? `${big.modelData.parts.length} parts` : '3D'}
-                      </span>
-                    </div>
-                    <div className="home-featured-big-meta">
-                      <span className="home-featured-big-title">{big.title || 'Untitled'}</span>
-                      <span className="home-featured-author">{big.authorName || big.author || 'Anonymous'}</span>
-                    </div>
-                  </button>
-                  <div className="home-featured-side">
-                    {rest.map(p => {
-                      const thumb = Array.isArray(p.thumb) ? p.thumb : ['#1a0a4a', '#7cf']
-                      return (
-                        <button key={p.id} className="home-featured-card" onClick={() => setMode('community')}>
-                          <div className="home-featured-thumb">
-                            <ModelSnapshot modelData={p.modelData} fallbackColors={thumb} />
-                            <span className="home-featured-badge">
-                              {p.modelData?.parts ? `${p.modelData.parts.length} parts` : '3D'}
-                            </span>
-                          </div>
-                          <div className="home-featured-meta">
-                            <span className="home-featured-title">{p.title || 'Untitled'}</span>
-                            <span className="home-featured-author">{p.authorName || p.author || 'Anonymous'}</span>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )
-            })()}
-          </div>
-        </section>
-      )}
     </div>
   )
 }
