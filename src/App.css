@@ -371,8 +371,12 @@
   display: flex; align-items: center; justify-content: center;
 }
 .card-preview-icon {
-  font-size: 28px; font-weight: 800; letter-spacing: -.03em;
-  color: rgba(255,255,255,.25); pointer-events: none;
+  position: absolute; bottom: 6px; right: 6px;
+  background: rgba(0,0,0,.5); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 4px;
+  backdrop-filter: blur(6px);
+  pointer-events: none; z-index: 2;
 }
 .card-body { padding: 14px 16px 16px; }
 .card-title { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
@@ -864,9 +868,15 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
-.user-info { flex: 1; min-width: 0; }
+.user-info { flex: 1; min-width: 0; text-align: left; }
 .user-name  { display: block; font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-email { display: block; font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-user-btn {
+  background: none; border: none; width: 100%; cursor: pointer;
+  transition: background .12s;
+}
+.sidebar-user-btn:hover { background: var(--surface-hover); }
+.user-chev { color: var(--text-3); font-size: 18px; line-height: 1; padding-right: 4px; }
 
 /* ════════════════════════════════════════
    3D MODE LAYOUT (model + image)
@@ -1875,6 +1885,85 @@
 .legal-body article ul { padding-left: 22px; }
 .legal-body article a { color: var(--accent2); }
 
+/* ── Help dialog (mirrors legal-page structure) ── */
+.help-page {
+  flex: 1; overflow-y: auto; padding: 28px 40px 60px;
+  background: var(--bg);
+}
+.help-head {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.help-close {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 12.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: var(--r-sm); cursor: pointer;
+}
+.help-close:hover { background: var(--surface-hover); color: var(--text); }
+.help-head h1 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.help-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  width: 100%; margin-top: 4px;
+}
+.help-tab {
+  background: none; border: 1px solid transparent; color: var(--text-3);
+  padding: 6px 12px; border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.help-tab:hover { color: var(--text-2); }
+.help-tab.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(124,58,237,.4); }
+
+.help-body { max-width: 780px; }
+.help-body article h2 {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  margin: 22px 0 10px;
+}
+.help-body article h2:first-child { margin-top: 0; }
+.help-body article h3 {
+  font-size: 13px; font-weight: 700; color: var(--text-2);
+  margin: 18px 0 8px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.help-body article p,
+.help-body article ul,
+.help-body article ol {
+  font-size: 13.5px; color: var(--text-2); line-height: 1.7; margin-bottom: 10px;
+}
+.help-body article ul, .help-body article ol { padding-left: 22px; }
+.help-body article li { margin-bottom: 6px; }
+.help-body article code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; padding: 1px 6px; border-radius: 4px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+}
+.help-body article kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; padding: 2px 6px; border-radius: 4px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-bright); box-shadow: 0 1px 0 var(--border);
+  margin: 0 2px;
+}
+.help-body article strong { color: var(--text); font-weight: 600; }
+
+/* Help button on Home hero */
+.home-hero-top {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.home-hero-text { display: flex; flex-direction: column; gap: 4px; }
+.home-help-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-2); padding: 7px 12px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+}
+.home-help-btn:hover {
+  background: var(--surface-hover); color: var(--text);
+  border-color: var(--border-bright);
+}
+.home-help-btn svg { width: 14px; height: 14px; }
+
 /* Forgot-password row + verify banner */
 .login-forgot-row {
   display: flex; justify-content: center; align-items: center;
@@ -2056,6 +2145,365 @@
 }
 .sound-lab-saved-play:hover { color: #7cffa8; border-color: rgba(124,255,168,.3); }
 .sound-lab-saved-del:hover  { color: var(--error); border-color: rgba(248,113,113,.3); }
+
+/* ── Home page ── */
+.home-page {
+  flex: 1; overflow-y: auto;
+  padding: 40px 48px 64px;
+  display: flex; flex-direction: column; gap: 36px;
+  max-width: 1180px;
+}
+
+/* Hero */
+.home-hero {
+  display: flex; flex-direction: column; gap: 22px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+.home-hero-greeting {
+  font-size: 13px; font-weight: 500; color: var(--text-3);
+  letter-spacing: .01em;
+}
+.home-hero-title {
+  font-size: 26px; font-weight: 700; color: var(--text);
+  letter-spacing: -.02em; line-height: 1.2;
+}
+.home-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+  gap: 28px; align-items: end;
+}
+.home-stat {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.home-stat-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.home-stat-value {
+  font-size: 22px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.home-stat-value-cap { text-transform: capitalize; }
+
+/* Section header (shared) */
+.home-section { display: flex; flex-direction: column; gap: 16px; }
+.home-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.home-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  letter-spacing: .01em;
+}
+.home-section-link {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 12.5px; font-weight: 500;
+  transition: color .12s;
+}
+.home-section-link:hover { color: var(--text); }
+.home-section-subtle { color: var(--text-3); font-size: 12px; }
+
+/* Quick access — restrained monochrome cards */
+.home-quick-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.home-quick-tile {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  text-align: left; cursor: pointer;
+  transition: border-color .15s, background .15s;
+  color: var(--text);
+}
+.home-quick-tile:hover {
+  border-color: var(--border-bright);
+  background: var(--surface-hover);
+}
+.home-quick-icon {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tile-accent) 12%, transparent);
+  color: var(--tile-accent);
+}
+.home-quick-icon svg { width: 18px; height: 18px; }
+.home-quick-tile-title {
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.home-quick-tile-blurb {
+  color: var(--text-3); font-size: 12px; line-height: 1.45;
+}
+
+/* Model snapshot — fills its container with the rendered/captured image,
+   regardless of source aspect. Fallback gradient also fills. */
+.model-snapshot, .model-snapshot-img, .model-snapshot-fallback {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+.model-snapshot-img { object-fit: cover; }
+
+/* Recent work — square thumb cards in a 4-up row */
+.home-recent-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.home-recent-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column;
+  cursor: pointer; padding: 0;
+  transition: border-color .15s;
+  text-align: left; color: var(--text);
+}
+.home-recent-card:hover { border-color: var(--border-bright); }
+.home-recent-thumb { position: relative; aspect-ratio: 1 / 1; }
+.home-recent-meta {
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 2px;
+}
+.home-recent-title {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-recent-time { color: var(--text-3); font-size: 11.5px; }
+
+/* Featured: 1 big card on the left + 3 small cards stacked on the right.
+   Stacks to a single column under 760px. */
+.home-featured-split {
+  display: grid; grid-template-columns: 1.6fr 1fr;
+  gap: 12px;
+  min-height: 360px;
+}
+.home-featured-card-big {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column;
+  cursor: pointer; padding: 0;
+  transition: border-color .15s;
+  text-align: left; color: var(--text);
+}
+.home-featured-card-big:hover { border-color: var(--border-bright); }
+.home-featured-big-thumb {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 10px;
+}
+.home-featured-big-meta {
+  padding: 14px 18px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.home-featured-big-title {
+  font-size: 16px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-featured-side {
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 0;
+}
+.home-featured-side .home-featured-card { flex: 1; min-height: 0; }
+
+/* Featured cards — horizontal layout: small square thumb on the left,
+   metadata on the right. Used in the side column of the 1+3 layout. */
+.home-featured-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: row; align-items: stretch;
+  cursor: pointer; padding: 0;
+  transition: border-color .15s;
+  text-align: left; color: var(--text);
+}
+.home-featured-card:hover { border-color: var(--border-bright); }
+.home-featured-thumb {
+  width: 84px; min-width: 84px; min-height: 84px; align-self: stretch;
+  position: relative;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 5px;
+}
+.home-featured-badge {
+  background: rgba(0,0,0,.5); color: #fff;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+  backdrop-filter: blur(6px);
+}
+.home-featured-meta {
+  flex: 1; min-width: 0;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;
+  justify-content: center;
+}
+.home-featured-title {
+  font-size: 14px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-featured-author { color: var(--text-3); font-size: 12px; }
+
+/* ── Account Settings ── */
+.account-page {
+  flex: 1; overflow-y: auto;
+  padding: 32px 44px 60px;
+  display: flex; flex-direction: column; gap: 18px;
+  max-width: 720px;
+}
+.account-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.account-close {
+  background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.account-close:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-bright); }
+.account-head h1 { font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
+
+.account-error, .account-info {
+  border-radius: var(--r-sm); padding: 10px 14px; font-size: 12.5px;
+}
+.account-error { background: rgba(248,113,113,.08); color: var(--error); }
+.account-info  { background: rgba(124,255,168,.08); color: #7cffa8; }
+
+.account-section {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.account-section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.account-avatar-row { display: flex; align-items: center; gap: 16px; }
+.account-avatar {
+  width: 76px; height: 76px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 700; color: #fff;
+  background-size: cover; background-position: center;
+  flex-shrink: 0; position: relative; overflow: hidden;
+}
+.account-avatar-initials { user-select: none; }
+.account-avatar-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.5); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+}
+.account-avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+.account-hint { color: var(--text-3); font-size: 11.5px; }
+
+.account-field { display: flex; flex-direction: column; gap: 6px; }
+.account-label {
+  font-size: 11.5px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.account-field-row { display: flex; gap: 8px; align-items: center; }
+.account-input {
+  flex: 1; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 9px 12px;
+  color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .12s;
+}
+.account-input:focus { border-color: rgba(124,207,255,.5); }
+.account-input:read-only { color: var(--text-2); cursor: default; }
+
+.account-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 14px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+.account-btn:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-bright); }
+.account-btn:disabled { opacity: .55; cursor: not-allowed; }
+.account-btn-primary {
+  background: linear-gradient(135deg, #7cf, #a855f7);
+  color: #04141a; border-color: transparent;
+}
+.account-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 18px rgba(124,207,255,.25);
+}
+
+.account-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 5px 10px; border-radius: 999px;
+  background: var(--surface); color: var(--text-3);
+  border: 1px solid var(--border);
+}
+.account-badge-ok {
+  color: #7cffa8; border-color: rgba(124,255,168,.3); background: rgba(124,255,168,.08);
+}
+
+.account-plan-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+}
+.account-plan-tier {
+  font-size: 18px; font-weight: 800; text-transform: capitalize;
+  letter-spacing: -.01em;
+}
+.account-plan-credits { color: var(--text-3); font-size: 12.5px; margin-top: 2px; }
+
+.account-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+}
+.account-row-title { font-size: 13.5px; font-weight: 600; }
+
+.account-signout {
+  background: rgba(248,113,113,.08);
+  color: var(--error); border: 1px solid rgba(248,113,113,.3);
+  border-radius: var(--r-sm); padding: 10px 14px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .12s;
+}
+.account-signout:hover { background: rgba(248,113,113,.16); }
+
+/* API keys */
+.account-newkey {
+  background: rgba(124,255,168,.06); border: 1px solid rgba(124,255,168,.3);
+  border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.account-newkey-head {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.account-newkey-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.account-newkey-value {
+  flex: 1; min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 8px 10px;
+  overflow: auto; white-space: nowrap;
+}
+.account-btn-link {
+  background: none; border: none; color: var(--text-3); padding: 4px;
+  font-size: 12px; align-self: flex-start; text-decoration: underline;
+}
+.account-btn-link:hover { color: var(--text); background: none; }
+.account-keys-create {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px;
+}
+.account-keys-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.account-keys-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.account-keys-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.account-keys-name {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.account-keys-fingerprint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; color: var(--text-3);
+}
+.account-btn-danger {
+  color: var(--error); border-color: rgba(248,113,113,.3);
+}
+.account-btn-danger:hover:not(:disabled) {
+  background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.5);
+}
 
 /* ── Weapon Lab ── */
 .weapon-lab {

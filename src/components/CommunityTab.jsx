@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import { useApp } from '../context/AppContext.jsx'
 import { buildGeometry } from '../lib/buildGeometry.js'
+import ModelSnapshot from './ModelSnapshot.jsx'
 
 // ── mini viewer (single WebGL context per card, mounted on hover) ──
 const V_DEF = `varying vec3 vNormal;varying vec3 vWorldPosition;void main(){vNormal=normalize(normalMatrix*normal);vWorldPosition=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`
@@ -93,14 +94,15 @@ function ModelCard({ model, isUserPost, onDelete }) {
 
   return (
     <div className="model-card" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div className="card-preview"
-        style={{ background: hovered ? undefined : `linear-gradient(135deg, ${model.thumb[0]}, ${model.thumb[1]})` }}>
-        {hovered && <MiniViewer modelData={model.modelData} />}
-        {!hovered && (
-          <div className="card-preview-icon">
-            {model.modelData.parts ? `${model.modelData.parts.length}P` : '3D'}
-          </div>
+      <div className="card-preview">
+        {hovered ? (
+          <MiniViewer modelData={model.modelData} />
+        ) : (
+          <ModelSnapshot modelData={model.modelData} fallbackColors={model.thumb} />
         )}
+        <div className="card-preview-icon">
+          {model.modelData.parts ? `${model.modelData.parts.length}P` : '3D'}
+        </div>
         {isUserPost && <span className="card-badge">Yours</span>}
       </div>
       <div className="card-body">

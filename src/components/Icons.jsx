@@ -42,3 +42,13 @@ export const IconUpload = () => <svg viewBox="0 0 24 24" {...s}>
 export const IconSparkle = () => <svg viewBox="0 0 24 24" fill="currentColor">
   <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17 5.8 21.3l2.4-7.4L2 9.4h7.6z"/>
 </svg>
+
+export const IconHome = () => <svg viewBox="0 0 24 24" {...s}>
+  <path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h4v-7h4v7h4a1 1 0 001-1V10"/>
+</svg>
+
+export const IconHelp = () => <svg viewBox="0 0 24 24" {...s}>
+  <circle cx="12" cy="12" r="10"/>
+  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+  <line x1="12" y1="17" x2="12.01" y2="17"/>
+</svg>

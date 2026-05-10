@@ -1,7 +1,8 @@
 import { useApp } from '../context/AppContext.jsx'
-import { IconCube, IconImage, IconCode, IconPlus, IconTrash, IconLogOut } from './Icons.jsx'
+import { IconCube, IconImage, IconCode, IconPlus, IconTrash, IconHome } from './Icons.jsx'
 
 const MODES = [
+  { key: 'home',      label: 'Home',          Icon: IconHome  },
   { key: 'model',     label: 'Text to 3D',    Icon: IconCube  },
   { key: 'image',     label: 'Image to 3D',   Icon: IconImage },
   { key: 'code',      label: 'Coding Buddy',  Icon: IconCode  },
@@ -9,7 +10,7 @@ const MODES = [
   { key: 'labs',      label: 'Labs',          Icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg> },
 ]
 
-const NO_CHAT_MODES = new Set(['community', 'labs'])
+const NO_CHAT_MODES = new Set(['home', 'community', 'labs'])
 
 function timeAgo(ts) {
   const s = (Date.now() - ts) / 1000
@@ -23,8 +24,8 @@ function initials(name = '') {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function Sidebar({ onClose, onOpenPricing, onOpenLegal }) {
-  const { user, signOut, mode, setMode, sessions, activeId, createSession, removeSession, loadSession, plan, credits } = useApp()
+export default function Sidebar({ onClose, onOpenPricing, onOpenLegal, onOpenAccount }) {
+  const { user, mode, setMode, sessions, activeId, createSession, removeSession, loadSession, plan, credits, avatarUrl, displayName } = useApp()
   const modeSessions = sessions.filter(s => s.mode === mode)
 
   return (
@@ -93,16 +94,19 @@ export default function Sidebar({ onClose, onOpenPricing, onOpenLegal }) {
         </div>
       )}
 
-      <div className="sidebar-user">
-        <div className="user-avatar">{initials(user?.name)}</div>
+      <button className="sidebar-user sidebar-user-btn" onClick={onOpenAccount} title="Account settings">
+        <div
+          className="user-avatar"
+          style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+        >
+          {!avatarUrl && initials(displayName || user?.name)}
+        </div>
         <div className="user-info">
-          <span className="user-name">{user?.name}</span>
+          <span className="user-name">{displayName || user?.name}</span>
           <span className="user-email">{user?.email}</span>
         </div>
-        <button className="icon-btn icon-btn-dim" onClick={signOut} title="Sign out">
-          <IconLogOut />
-        </button>
-      </div>
+        <span className="user-chev">›</span>
+      </button>
     </aside>
   )
 }

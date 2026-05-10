@@ -3,7 +3,7 @@ import * as S from '../lib/storage.js'
 import { signOutUser, onAuthChange, isFirebaseReady } from '../lib/firebaseAuth.js'
 import * as F from '../lib/firestoreStore.js'
 import { db, auth } from '../lib/firebase.js'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
@@ -16,11 +16,13 @@ function defaultBrainForPlan(plan) {
 
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
-  const [mode, setMode]         = useState('model')
+  const [mode, setMode]         = useState('home')
   const [renderer, setRenderer] = useState('threejs')
   const [shaderLang, setShaderLang] = useState('glsl')
   const [plan, setPlanState] = useState(() => localStorage.getItem('plixie_plan') || 'free')
   const [credits, setCredits] = useState(0)
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [displayName, setDisplayName] = useState(null)
   const [aiBrain, setAiBrainState] = useState(() =>
     localStorage.getItem('plixie_brain') || defaultBrainForPlan(localStorage.getItem('plixie_plan') || 'free'),
   )
@@ -112,8 +114,22 @@ export function AppProvider({ children }) {
         localStorage.setItem('plixie_plan', data.plan)
       }
       if (typeof data.credits === 'number') setCredits(data.credits)
+      setAvatarUrl(data.avatarUrl || null)
+      setDisplayName(data.name || null)
     })
     return () => { cancelled = true; unsub() }
+  }, [cloudUid])
+
+  // Patch user-doc fields the firestore.rules allowlist permits (name,
+  // email, avatarUrl). Returns the merged data; safe no-op for local users.
+  const updateProfile = useCallback(async (patch) => {
+    if (!cloudUid || !db) return null
+    const safe = {}
+    if (typeof patch.name === 'string')      safe.name = patch.name
+    if (typeof patch.avatarUrl === 'string') safe.avatarUrl = patch.avatarUrl
+    safe.updatedAt = serverTimestamp()
+    await setDoc(doc(db, 'users', cloudUid), safe, { merge: true })
+    return safe
   }, [cloudUid])
 
   async function handleSignOut() {
@@ -330,6 +346,7 @@ export function AppProvider({ children }) {
       aiVariant, setAiVariant,
       plan, setPlan,
       credits,
+      avatarUrl, displayName, updateProfile,
       sessions, activeSession, activeId,
       createSession, updateSession, removeSession, loadSession,
       communityPosts, publishToCommunity, unpublishCommunity,
