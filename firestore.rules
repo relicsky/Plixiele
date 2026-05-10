@@ -47,6 +47,17 @@ service cloud.firestore {
                             && request.auth.uid == resource.data.authorUid;
     }
 
+    // Shareable links — anyone can read (so non-signed-in recipients can
+    // still see what's about to be shared with them), only the owner can
+    // create/update/delete.
+    match /shares/{shareId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.ownerUid;
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == resource.data.ownerUid;
+    }
+
     // Stripe extension: customers + their nested checkout/subscription docs.
     // The "firestore-stripe-payments" extension manages writes via webhook;
     // clients only read their own and create checkout sessions.

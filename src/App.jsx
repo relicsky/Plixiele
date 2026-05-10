@@ -12,6 +12,7 @@ import PricingPage from './components/PricingPage.jsx'
 import LegalPage from './components/LegalPage.jsx'
 import AccountSettings from './components/AccountSettings.jsx'
 import HelpDialog from './components/HelpDialog.jsx'
+import SharedModelView from './components/SharedModelView.jsx'
 import VerifyBanner from './components/VerifyBanner.jsx'
 import './App.css'
 
@@ -62,6 +63,25 @@ function Shell() {
 }
 
 export default function App() {
-  const { user } = useApp()
-  return user ? <Shell /> : <LoginPage />
+  const { user, incomingShare, shareError } = useApp()
+  if (!user) return <LoginPage />
+  // A pending share takes over the whole main view until the user dismisses
+  // it (Save / Go to Home). The sidebar stays put so they can still navigate.
+  if (incomingShare || shareError) {
+    return (
+      <div className="shell">
+        <Sidebar
+          onClose={() => {}}
+          onOpenPricing={() => {}}
+          onOpenLegal={() => {}}
+          onOpenAccount={() => {}}
+        />
+        <main className="main">
+          <VerifyBanner />
+          <SharedModelView />
+        </main>
+      </div>
+    )
+  }
+  return <Shell />
 }

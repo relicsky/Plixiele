@@ -4,6 +4,8 @@ import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { downloadModelGLB } from '../lib/exportGLB.js'
 import { buildGeometry } from '../lib/buildGeometry.js'
+import { createShare } from '../lib/firestoreStore.js'
+import { useApp } from '../context/AppContext.jsx'
 import PublishDialog from './PublishDialog.jsx'
 
 const DEFAULT_VERT = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -135,12 +137,14 @@ function ContextBridge({ onReady }) {
 }
 
 export default function ThreeViewer({ modelData, isGenerating }) {
+  const { user } = useApp()
   const [wireframe, setWireframe] = useState(false)
   const [threeCtx, setThreeCtx] = useState(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [justPublished, setJustPublished] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [shareLabel, setShareLabel] = useState(null)
+  const [sharing, setSharing] = useState(false)
 
   function downloadPNG() {
     if (!threeCtx) return
@@ -160,24 +164,40 @@ export default function ThreeViewer({ modelData, isGenerating }) {
   }
 
   async function shareModel() {
-    if (!modelData) return
-    const text = `${modelData.description || 'A 3D model made with Plixiele'}`
-    const url = window.location.origin
-    const payload = { title: 'Plixiele 3D model', text, url }
+    if (!modelData || sharing) return
+    setSharing(true)
+    setShareLabel(null)
     try {
-      if (navigator.share) {
-        await navigator.share(payload)
-        setShareLabel('Shared')
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(`${text}\n${url}`)
-        setShareLabel('Copied')
-      } else {
-        setShareLabel('Unsupported')
+      const shareId = await createShare(modelData, user)
+      if (!shareId) {
+        setShareLabel('Sign in first')
+        return
       }
-    } catch (e) {
-      if (e?.name !== 'AbortError') setShareLabel('Failed')
+      const url = `${window.location.origin}/?share=${shareId}`
+      const text = modelData.description || 'A 3D model made with Plixiele'
+      const payload = { title: 'Plixiele 3D model', text, url }
+      try {
+        if (navigator.share) {
+          await navigator.share(payload)
+          setShareLabel('Shared')
+        } else if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url)
+          setShareLabel('Link copied')
+        } else {
+          // Fallback: at least show the URL so the user can hand-copy.
+          window.prompt('Copy this share link:', url)
+          setShareLabel('Link ready')
+        }
+      } catch (err) {
+        if (err?.name !== 'AbortError') setShareLabel('Failed')
+      }
+    } catch (err) {
+      console.error('Share failed:', err)
+      setShareLabel('Failed')
+    } finally {
+      setSharing(false)
+      setTimeout(() => setShareLabel(null), 2200)
     }
-    setTimeout(() => setShareLabel(null), 1800)
   }
 
   function downloadHLSL() {

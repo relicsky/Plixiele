@@ -2,7 +2,7 @@ import { db } from './firebase.js'
 import { isFirebaseReady } from './firebaseAuth.js'
 import {
   collection, doc, onSnapshot, setDoc, deleteDoc,
-  query, orderBy, getDocs, limit,
+  query, orderBy, getDocs, limit, getDoc,
 } from 'firebase/firestore'
 
 const cloudReady = () => isFirebaseReady() && !!db
@@ -66,6 +66,37 @@ export async function publishCommunity(post, user) {
 export async function unpublishCommunity(id) {
   if (!cloudReady()) return
   await deleteDoc(doc(db, 'community', id))
+}
+
+// ── Shareable model links ──
+//
+// Every share creates a fresh shares/{shareId} doc with a snapshot of the
+// model JSON. Public read so non-signed-in recipients can fetch and preview
+// before they sign up. Owner-only write per firestore.rules.
+
+export async function createShare(modelData, user) {
+  if (!cloudReady() || !isFirebaseUid(user?.uid)) return null
+  const shareId = genId('sh')
+  await setDoc(doc(db, 'shares', shareId), {
+    id: shareId,
+    modelData,
+    ownerUid: user.uid,
+    ownerName: user.name || user.email || 'A Plixiele creator',
+    title: modelData?.description || 'Plixiele creation',
+    createdAt: Date.now(),
+  })
+  return shareId
+}
+
+export async function getShare(shareId) {
+  if (!cloudReady() || !shareId) return null
+  try {
+    const snap = await getDoc(doc(db, 'shares', shareId))
+    return snap.exists() ? snap.data() : null
+  } catch (err) {
+    console.warn('getShare failed:', err.message)
+    return null
+  }
 }
 
 // ── One-time migration of localStorage → Firestore ──

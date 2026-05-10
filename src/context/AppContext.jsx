@@ -5,6 +5,23 @@ import * as F from '../lib/firestoreStore.js'
 import { db, auth } from '../lib/firebase.js'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 
+const PENDING_SHARE_KEY = 'plixie_pending_share'
+
+// Read ?share=<id> from the URL (if present) and stash it in localStorage so
+// it survives a redirect through sign-up. Strip it from the URL afterward so
+// a refresh doesn't re-trigger the flow.
+function captureShareFromUrl() {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  const id = params.get('share')
+  if (!id) return localStorage.getItem(PENDING_SHARE_KEY) || null
+  localStorage.setItem(PENDING_SHARE_KEY, id)
+  params.delete('share')
+  const cleaned = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash
+  window.history.replaceState({}, '', cleaned)
+  return id
+}
+
 const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
 
@@ -38,6 +55,32 @@ export function AppProvider({ children }) {
   const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
   const [savedSounds, setSavedSounds] = useState(() => S.getSounds())
   const [savedModels, setSavedModels] = useState(() => S.getModels())
+
+  // Incoming share — populated when the URL has ?share=<id>. Lives across a
+  // sign-up redirect via localStorage so the recipient sees the model the
+  // moment they finish creating an account.
+  const [pendingShareId, setPendingShareId] = useState(() => captureShareFromUrl())
+  const [incomingShare, setIncomingShare] = useState(null)
+  const [shareError, setShareError] = useState(null)
+
+  useEffect(() => {
+    if (!pendingShareId) return
+    let cancelled = false
+    ;(async () => {
+      const data = await F.getShare(pendingShareId)
+      if (cancelled) return
+      if (data) setIncomingShare(data)
+      else      setShareError('This share link is no longer available.')
+    })()
+    return () => { cancelled = true }
+  }, [pendingShareId])
+
+  const dismissShare = useCallback(() => {
+    setIncomingShare(null)
+    setPendingShareId(null)
+    setShareError(null)
+    localStorage.removeItem(PENDING_SHARE_KEY)
+  }, [])
 
   const cloudUid = useMemo(
     () => (isFirebaseReady() && user?.uid && !user.uid.startsWith('local_')) ? user.uid : null,
@@ -353,6 +396,7 @@ export function AppProvider({ children }) {
       savedScenes, persistScene, removeScene,
       savedSounds, persistSound, removeSound,
       savedModels, persistModel, removeModel,
+      incomingShare, shareError, dismissShare,
     }}>
       {children}
     </Ctx.Provider>
