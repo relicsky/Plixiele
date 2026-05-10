@@ -20,6 +20,13 @@ const FEATURES = [
     blurb: 'AI-generated sound effects and short music. Plays in browser, exports as WAV. (50 credits)',
     accent: '#7cffa8',
   },
+  {
+    key: 'weapon',
+    icon: '⚔',
+    title: 'Weapon Generator',
+    blurb: 'Type a weapon name. Gemini researches real reference details, then Claude generates a 3D model. (15 credits)',
+    accent: '#ffaa50',
+  },
 ]
 
 export default function LabsHome({ onPick }) {

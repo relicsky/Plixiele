@@ -84,6 +84,12 @@ export async function migrateLocalToCloud(uid, local, currentUser) {
     for (const scene of local.scenes || []) {
       tasks.push(saveUserDoc(uid, 'scenes', scene))
     }
+    for (const sound of local.sounds || []) {
+      tasks.push(saveUserDoc(uid, 'sounds', sound))
+    }
+    for (const model of local.models || []) {
+      tasks.push(saveUserDoc(uid, 'models', model))
+    }
     // Only push community posts if the cloud feed is empty for this user.
     // (Avoid spamming the global feed with duplicates on every device.)
     const existing = await getDocs(query(collection(db, 'community'), limit(1)))

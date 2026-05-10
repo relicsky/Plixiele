@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { defineSecret } from 'firebase-functions/params'
+import { SYSTEM_PROMPT } from './systemPrompt.js'
 
 initializeApp()
 const db = getFirestore()
@@ -22,7 +23,7 @@ const PLAN_CREDITS = {
   pro:     1500,
   premium: 5000,
 }
-const COST = { gen: 10, chat: 2, sound: 50 }
+const COST = { gen: 10, chat: 2, sound: 50, weapon: 15 }
 
 // Dev / staff allowlist — these emails are auto-upgraded to Premium with
 // full credits regardless of subscription status. Add yourself here.
@@ -227,6 +228,192 @@ export const geminiProxy = onRequest(
         },
       ),
     })
+  },
+)
+
+// ── Weapon Generator (Labs feature) ──
+//
+// Two-step orchestration done server-side so neither API key is ever exposed
+// and we can charge a single credit cost for the whole flow:
+//
+//   Step 1 — Gemini 2.5 Flash with google_search grounding looks up real
+//            visual reference details for the weapon name.
+//   Step 2 — Claude Sonnet generates the model JSON spec (same format every
+//            other generator outputs) using that description as ground truth.
+//
+// The response is an SSE stream of stage events so the UI can show
+// "Researching…" then "Modeling…" instead of one long opaque spinner.
+//
+// Fallback: if Gemini fails or returns nothing useful, we skip the description
+// and have Claude generate from the weapon name alone. The user still gets a
+// model — just without the research-grounded detail.
+
+async function fetchGeminiGroundedDescription(weaponName, style) {
+  // The safety clause asks Gemini to stylize real-world firearm requests
+  // rather than refuse outright — keeps the feature usable for fantasy/sci-fi
+  // weapons that share a name with a real product.
+  const prompt =
+    `Describe the visual appearance of a ${weaponName} in detail. Focus on shape, ` +
+    `proportions, materials, colors, and distinctive visual features. Output in ` +
+    `3-5 sentences. Style preference: ${style}. ` +
+    `If the requested item is a real-world modern firearm by specific brand/model, ` +
+    `generate a description of a similar but stylized fictional version instead.`
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY.value()}`
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    tools: [{ google_search: {} }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 30000)
+  let r
+  try {
+    r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 240)}`)
+  const j = await r.json()
+  const text = (j?.candidates?.[0]?.content?.parts || [])
+    .map(p => p.text).filter(Boolean).join('').trim()
+  if (!text || text.length < 20) throw new Error('Gemini returned empty/too-short description')
+  return text
+}
+
+async function fetchClaudeWeaponModel(weaponName, style, description) {
+  const userMessage = description
+    ? `Reference description (from web search):\n"${description}"\n\n` +
+      `Create a 3D model JSON of a ${weaponName} matching this description. ` +
+      `Style preference: ${style}. Use the "parts" format with separate components ` +
+      `(grip/handle, blade/barrel/limbs, decorative elements). Center the model at origin.`
+    : `Create a 3D model JSON of a ${weaponName}. Style preference: ${style}. ` +
+      `Use the "parts" format with separate components (grip/handle, blade/barrel/limbs, ` +
+      `decorative elements). Center the model at origin.`
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 90000)
+  let r
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY.value(),
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 24000,
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 240)}`)
+  const j = await r.json()
+  const text = (j?.content || []).map(b => b.text || '').join('')
+  return parseModelJSONServer(text)
+}
+
+// Server-side JSON extraction. Mirrors the client-side parser shape but kept
+// local so functions/ stays self-contained.
+function parseModelJSONServer(text) {
+  const tryParse = (s) => { try { return JSON.parse(s) } catch { return null } }
+  for (const m of (text || '').matchAll(/```(?:json)?\s*([\s\S]*?)```/g)) {
+    const r = tryParse(m[1].trim()); if (r) return r
+  }
+  // Fallback: extract the first balanced {...}
+  let start = -1, depth = 0, inStr = false, esc = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (esc) { esc = false; continue }
+    if (c === '\\' && inStr) { esc = true; continue }
+    if (c === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (c === '{') { if (start === -1) start = i; depth++ }
+    else if (c === '}') {
+      if (--depth === 0 && start !== -1) {
+        const r = tryParse(text.slice(start, i + 1)); if (r) return r
+      }
+    }
+  }
+  throw new Error('Could not parse model JSON from Claude response')
+}
+
+export const generateWeapon = onRequest(
+  {
+    region: 'us-central1',
+    secrets: [ANTHROPIC_API_KEY, GEMINI_API_KEY],
+    cors: false,
+    timeoutSeconds: 540,
+    memory: '512MiB',
+  },
+  async (req, res) => {
+    setCors(req, res)
+    if (req.method === 'OPTIONS') { res.status(204).end(); return }
+    if (req.method !== 'POST')   { res.status(405).end(); return }
+
+    const user = await requireUser(req, res)
+    if (!user) return
+
+    const { name = '', style = 'Stylized' } = req.body || {}
+    const weaponName = String(name).trim().slice(0, 120)
+    if (!weaponName) { res.status(400).json({ error: 'Missing weapon name' }); return }
+
+    await ensureProfile(user.uid, user.email)
+    const cost = COST.weapon
+
+    try {
+      await consumeCredits(user.uid, cost)
+    } catch (e) {
+      if (e.message === 'INSUFFICIENT_CREDITS') {
+        res.status(402).json({ error: 'Out of credits. Upgrade your plan.', cost, intent: 'weapon' })
+        return
+      }
+      res.status(500).json({ error: e.message }); return
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache, no-transform')
+    res.setHeader('Connection', 'keep-alive')
+
+    const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`)
+
+    // Step 1 — grounded description (best-effort; fall through on failure)
+    send({ stage: 'researching' })
+    let description = ''
+    try {
+      description = await fetchGeminiGroundedDescription(weaponName, style)
+    } catch (e) {
+      console.warn(`generateWeapon: Gemini grounding failed for "${weaponName}", continuing with Claude-only:`, e.message)
+      description = ''
+    }
+
+    // Step 2 — model generation
+    send({ stage: 'modeling', description: description || null })
+    let model
+    try {
+      model = await fetchClaudeWeaponModel(weaponName, style, description)
+    } catch (e) {
+      console.error(`generateWeapon: Claude failed for "${weaponName}":`, e.message)
+      // Total failure — refund the credits.
+      await db.doc(`users/${user.uid}`).update({ credits: FieldValue.increment(cost) })
+      send({ stage: 'error', message: 'Generation failed — try again' })
+      res.end(); return
+    }
+
+    send({ stage: 'done', model, description: description || null, weaponName, style })
+    res.end()
   },
 )
 

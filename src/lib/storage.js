@@ -4,6 +4,7 @@ const KEYS = {
   COMMUNITY: 'plixie_community_posts',
   SCENES: 'plixie_saved_scenes',
   SOUNDS: 'plixie_saved_sounds',
+  MODELS: 'plixie_saved_models',
 }
 
 function read(key, fallback = null) {
@@ -81,4 +82,20 @@ export function saveSound(sound) {
 
 export function deleteSound(id) {
   write(KEYS.SOUNDS, getSounds().filter(s => s.id !== id))
+}
+
+// Saved models (Model Library — feeds Weapon Generator and any future
+// generator that wants a persistent library separate from chat sessions).
+export const getModels = () => read(KEYS.MODELS, [])
+
+export function saveModel(model) {
+  const all = getModels()
+  const idx = all.findIndex(m => m.id === model.id)
+  if (idx >= 0) all[idx] = model
+  else all.unshift(model)
+  write(KEYS.MODELS, all)
+}
+
+export function deleteModel(id) {
+  write(KEYS.MODELS, getModels().filter(m => m.id !== id))
 }

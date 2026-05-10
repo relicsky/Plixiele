@@ -23,6 +23,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '',
       },
+      '/api/weapon': {
+        target: `${FN_BASE}/generateWeapon`,
+        changeOrigin: true,
+        rewrite: () => '',
+      },
     },
   },
 })

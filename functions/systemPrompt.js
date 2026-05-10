@@ -1,3 +1,6 @@
+// Mirror of src/lib/systemPrompt.js. Cloud Functions deploys bundle only the
+// functions/ directory, so we can't import from src/. Keep this file in sync
+// with the original — if you change the model JSON spec there, change it here too.
 export const SYSTEM_PROMPT = `You are Plixie, an expert 3D model generation agent. Generate beautiful, shader-based 3D models using Three.js geometry and custom GLSL shaders.
 
 ## CRITICAL: Output Format

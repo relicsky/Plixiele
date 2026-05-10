@@ -22,6 +22,9 @@ service cloud.firestore {
       match /sounds/{sid} {
         allow read, write: if request.auth.uid == uid;
       }
+      match /models/{mid} {
+        allow read, write: if request.auth.uid == uid;
+      }
     }
 
     // Shared community feed

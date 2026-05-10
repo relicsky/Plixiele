@@ -4,9 +4,11 @@ import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
+import { buildGeometry } from '../lib/buildGeometry.js'
 import SceneBuilder from './SceneBuilder.jsx'
 import LabsHome from './LabsHome.jsx'
 import SoundLab from './SoundLab.jsx'
+import WeaponLab from './WeaponLab.jsx'
 
 // ── shader re-use helper ──
 const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -31,11 +33,9 @@ function LabsMesh({ model, shaderKey }) {
   const groupRef = useRef()
   const { size } = useThree()
   const part = model.parts ? model.parts[0] : model
-  const geo = useMemo(() => {
-    try { const G = THREE[part.geometry?.type]; return new G(...(part.geometry?.params || [])) }
-    catch { return new THREE.SphereGeometry(1, 48, 48) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shaderKey])
+  const geo = useMemo(() => buildGeometry(part.geometry),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shaderKey])
 
   const initUniforms = useMemo(() => buildUniforms(part.uniforms), [shaderKey])
 
@@ -131,7 +131,7 @@ function UniformControl({ name, def, onChange }) {
 }
 
 // ── Main Labs component ──
-const FEATURE_TITLES = { scene: 'Scene Builder', shader: 'Shader Lab', sound: 'Sound Lab' }
+const FEATURE_TITLES = { scene: 'Scene Builder', shader: 'Shader Lab', sound: 'Sound Lab', weapon: 'Weapon Generator' }
 
 export default function LabsTab() {
   const [active, setActive] = useState(null)
@@ -153,6 +153,7 @@ export default function LabsTab() {
       {active === 'scene' && <SceneBuilder />}
       {active === 'shader' && <ShaderLab />}
       {active === 'sound' && <SoundLab />}
+      {active === 'weapon' && <WeaponLab />}
     </div>
   )
 }

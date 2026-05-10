@@ -35,6 +35,7 @@ export function AppProvider({ children }) {
   const [communityPosts, setCommunityPosts] = useState(() => S.getCommunityPosts())
   const [savedScenes, setSavedScenes] = useState(() => S.getScenes())
   const [savedSounds, setSavedSounds] = useState(() => S.getSounds())
+  const [savedModels, setSavedModels] = useState(() => S.getModels())
 
   const cloudUid = useMemo(
     () => (isFirebaseReady() && user?.uid && !user.uid.startsWith('local_')) ? user.uid : null,
@@ -59,18 +60,21 @@ export function AppProvider({ children }) {
       setSessions(S.getSessions())
       setSavedScenes(S.getScenes())
       setSavedSounds(S.getSounds())
+      setSavedModels(S.getModels())
       return
     }
     F.migrateLocalToCloud(cloudUid, {
       sessions: S.getSessions(),
       scenes: S.getScenes(),
       sounds: S.getSounds(),
+      models: S.getModels(),
       community: S.getCommunityPosts(),
     }, user)
     const unsubA = F.watchUserCollection(cloudUid, 'sessions', setSessions)
     const unsubB = F.watchUserCollection(cloudUid, 'scenes', setSavedScenes)
     const unsubC = F.watchUserCollection(cloudUid, 'sounds', setSavedSounds)
-    return () => { unsubA(); unsubB(); unsubC() }
+    const unsubD = F.watchUserCollection(cloudUid, 'models', setSavedModels)
+    return () => { unsubA(); unsubB(); unsubC(); unsubD() }
   }, [cloudUid, user])
 
   // Community feed — Firestore when available, localStorage otherwise.
@@ -273,6 +277,43 @@ export function AppProvider({ children }) {
     }
   }, [cloudUid])
 
+  const persistModel = useCallback((model) => {
+    const full = {
+      id: model.id || S.newId(),
+      title: model.title || model.weaponName || 'Untitled model',
+      type: model.type || 'model',
+      weaponName: model.weaponName || null,
+      style: model.style || null,
+      description: model.description || null,
+      modelData: model.modelData || null,
+      brain: model.brain || null,
+      createdAt: model.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    }
+    if (cloudUid) {
+      F.saveUserDoc(cloudUid, 'models', full)
+      setSavedModels(prev => {
+        const idx = prev.findIndex(m => m.id === full.id)
+        if (idx >= 0) { const next = [...prev]; next[idx] = full; return next }
+        return [full, ...prev]
+      })
+    } else {
+      S.saveModel(full)
+      setSavedModels(S.getModels())
+    }
+    return full
+  }, [cloudUid])
+
+  const removeModel = useCallback((id) => {
+    if (cloudUid) {
+      F.deleteUserDoc(cloudUid, 'models', id)
+      setSavedModels(prev => prev.filter(m => m.id !== id))
+    } else {
+      S.deleteModel(id)
+      setSavedModels(S.getModels())
+    }
+  }, [cloudUid])
+
   const activeSession = {
     model: sessions.find(s => s.id === activeId.model) || null,
     image: sessions.find(s => s.id === activeId.image) || null,
@@ -294,6 +335,7 @@ export function AppProvider({ children }) {
       communityPosts, publishToCommunity, unpublishCommunity,
       savedScenes, persistScene, removeScene,
       savedSounds, persistSound, removeSound,
+      savedModels, persistModel, removeModel,
     }}>
       {children}
     </Ctx.Provider>
