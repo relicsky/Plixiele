@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { defineSecret } from 'firebase-functions/params'
+import crypto from 'node:crypto'
 import { SYSTEM_PROMPT } from './systemPrompt.js'
 
 initializeApp()
@@ -12,6 +13,13 @@ const db = getFirestore()
 
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY')
 const GEMINI_API_KEY    = defineSecret('GEMINI_API_KEY')
+// Mailgun secrets — set with:
+//   firebase functions:secrets:set MAILGUN_API_KEY
+//   firebase functions:secrets:set MAILGUN_WEBHOOK_KEY
+//   firebase functions:secrets:set MAILGUN_DOMAIN
+const MAILGUN_API_KEY     = defineSecret('MAILGUN_API_KEY')
+const MAILGUN_WEBHOOK_KEY = defineSecret('MAILGUN_WEBHOOK_KEY')
+const MAILGUN_DOMAIN      = defineSecret('MAILGUN_DOMAIN')
 
 // ── Plan / credit policy ──
 //   Generation = 10 credits, Chat = 2 credits.
@@ -416,6 +424,402 @@ export const generateWeapon = onRequest(
     res.end()
   },
 )
+
+// ── Email support assistant (Mailgun inbound webhook → Claude → Mailgun reply) ──
+//
+// Flow: someone emails help@plixiele.com → Mailgun receives via the route we
+// configure → Mailgun POSTs the parsed email to /api/email/inbound → this
+// function verifies the signature, asks Claude for a reply, and sends it back
+// out via Mailgun's send API.
+//
+// Setup is in MAILGUN_SETUP.md (DNS records, route, secrets).
+
+const SUPPORT_SYSTEM_PROMPT = `You are the Plixiele support assistant, replying to a user's email.
+
+About Plixiele: a web app at plixiele-sign-in.web.app where users generate 3D
+models, scenes, shaders, and sounds with AI (Anthropic Claude + Google Gemini).
+Subscriptions: Free / Basic ($10) / Pro ($20) / Premium ($100). Credits-based:
+gen=10, chat=2, sound=50, weapon=15. Workspaces: Text to 3D, Image to 3D,
+Coding Buddy, Community, Labs (Scene Builder, Shader Lab, Sound Lab, Weapon
+Generator). There's also a Roblox Studio plugin you can install via Account →
+API Keys + Help → Roblox.
+
+Reply rules:
+- Be friendly, concise, and direct. Plain prose. No emojis. No markdown headers.
+- When the user describes a bug or error, ASK SPECIFICALLY for whatever they
+  haven't provided: (a) the exact error message they saw, (b) what they were
+  doing when it broke, (c) which workspace they were in, (d) browser + OS if
+  relevant, (e) a screenshot. Don't ask for what they already gave you.
+- For "how do I do X" questions, give the concrete steps.
+- For account / billing / subscription / refund / credits-balance disputes,
+  say a human will follow up within 24 hours. Do NOT make promises about
+  refunds, plan changes, or credit grants yourself.
+- For anything you don't know, say so plainly. Don't invent features.
+- Sign off with "— Plixiele Support".`
+
+// Strip the most common quoted-reply patterns so the model only sees the new
+// message, not the entire prior thread.
+function stripQuotedReply(text) {
+  if (!text) return ''
+  const lines = text.split(/\r?\n/)
+  const out = []
+  for (const line of lines) {
+    if (/^On .* wrote:\s*$/.test(line)) break        // Gmail / Apple Mail
+    if (/^>+ /.test(line)) continue                   // quoted lines
+    if (/^-+ ?Original Message ?-+/i.test(line)) break
+    if (/^From:.*\bPlixiele Support\b/.test(line)) break
+    out.push(line)
+  }
+  return out.join('\n').trim()
+}
+
+function escapeMailgunHeader(s) {
+  return String(s || '').replace(/[\r\n]/g, ' ').trim()
+}
+
+async function sendMailgunReply({ to, subject, body, inReplyTo, references }) {
+  const domain = MAILGUN_DOMAIN.value()
+  const url = `https://api.mailgun.net/v3/${domain}/messages`
+  const form = new URLSearchParams()
+  form.set('from', `Plixiele Support <help@${domain.replace(/^mg\./, '')}>`)
+  form.set('to', to)
+  form.set('subject', subject)
+  form.set('text', body)
+  if (inReplyTo)  form.set('h:In-Reply-To', escapeMailgunHeader(inReplyTo))
+  if (references) form.set('h:References',  escapeMailgunHeader(references))
+  // Marker so we can ignore our own bounced replies if they ever come back.
+  form.set('h:X-Plixiele-Auto-Reply', '1')
+
+  const auth = 'Basic ' + Buffer.from(`api:${MAILGUN_API_KEY.value()}`).toString('base64')
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  })
+  if (!r.ok) {
+    const errText = await r.text()
+    throw new Error(`Mailgun send failed (${r.status}): ${errText.slice(0, 240)}`)
+  }
+}
+
+// HMAC-SHA256 verification per Mailgun's webhook docs.
+function verifyMailgunSignature(timestamp, token, signature) {
+  if (!timestamp || !token || !signature) return false
+  // Reject replays older than 5 minutes (Mailgun timestamps are unix seconds).
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp))
+  if (!Number.isFinite(age) || age > 300) return false
+  const computed = crypto
+    .createHmac('sha256', MAILGUN_WEBHOOK_KEY.value())
+    .update(timestamp + token)
+    .digest('hex')
+  // timingSafeEqual throws if buffers are different lengths
+  if (computed.length !== signature.length) return false
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(signature))
+}
+
+async function askClaudeForSupportReply(subject, fromName, body) {
+  const userMessage =
+    `From: ${fromName || 'a Plixiele user'}\n` +
+    `Subject: ${subject || '(no subject)'}\n\n` +
+    `Message:\n${body}`
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY.value(),
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      system: [{ type: 'text', text: SUPPORT_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  })
+  if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 240)}`)
+  const j = await r.json()
+  return (j?.content || []).map(b => b.text || '').join('').trim()
+}
+
+export const mailgunInbound = onRequest(
+  {
+    region: 'us-central1',
+    secrets: [ANTHROPIC_API_KEY, MAILGUN_API_KEY, MAILGUN_WEBHOOK_KEY, MAILGUN_DOMAIN],
+    cors: false,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).end(); return }
+
+    // Mailgun inbound posts as multipart/form-data or url-encoded depending on
+    // the route action. firebase-functions parses both into req.body for us.
+    const body = req.body || {}
+    const ts        = body.timestamp || body.signature?.timestamp
+    const token     = body.token     || body.signature?.token
+    const signature = body.signature?.signature || body['signature']
+
+    // Mailgun "store(notify)" routes nest signature; legacy "forward" routes
+    // post fields flat. Handle both.
+    const flatSig = typeof signature === 'string' ? signature : null
+    const okSig = verifyMailgunSignature(ts, token, flatSig)
+    if (!okSig) {
+      console.warn('mailgunInbound: signature verification failed')
+      res.status(401).json({ error: 'Bad signature' })
+      return
+    }
+
+    // Bot / auto-reply detection — never reply to our own bounces or to
+    // "noreply@" senders (prevents loops).
+    const sender = String(body.sender || body.from || '').toLowerCase()
+    const headers = body['message-headers'] ? safeParseJSON(body['message-headers']) : []
+    const headerMap = {}
+    for (const [k, v] of (Array.isArray(headers) ? headers : [])) headerMap[String(k).toLowerCase()] = v
+
+    if (
+      headerMap['x-plixiele-auto-reply'] ||
+      headerMap['auto-submitted'] ||
+      headerMap['precedence'] === 'bulk' ||
+      /^(noreply|no-reply|mailer-daemon|postmaster)@/i.test(sender)
+    ) {
+      console.info('mailgunInbound: ignoring auto-reply / bulk message from', sender)
+      res.status(200).json({ ignored: true })
+      return
+    }
+
+    const subject = String(body.subject || '(no subject)')
+    const fromName = String(body.from || '').replace(/<[^>]*>/g, '').trim()
+    const rawBody = body['body-plain'] || body['stripped-text'] || body['body-html'] || ''
+    const cleanBody = stripQuotedReply(String(rawBody))
+
+    if (!cleanBody) {
+      console.info('mailgunInbound: empty body after stripping quotes')
+      res.status(200).json({ ignored: true })
+      return
+    }
+
+    let reply
+    try {
+      reply = await askClaudeForSupportReply(subject, fromName, cleanBody)
+    } catch (e) {
+      console.error('mailgunInbound: Claude failed:', e.message)
+      // Acknowledge to Mailgun so it doesn't retry forever; log + alert
+      // separately if you wire up monitoring.
+      res.status(200).json({ ignored: true, reason: 'claude_failed' })
+      return
+    }
+
+    const replySubject = subject.match(/^Re:/i) ? subject : `Re: ${subject}`
+    try {
+      await sendMailgunReply({
+        to: sender,
+        subject: replySubject,
+        body: reply + '\n\n— Plixiele Support',
+        inReplyTo: headerMap['message-id'],
+        references: headerMap['message-id'],
+      })
+    } catch (e) {
+      console.error('mailgunInbound: send failed:', e.message)
+      res.status(500).json({ error: e.message })
+      return
+    }
+
+    res.status(200).json({ ok: true })
+  },
+)
+
+function safeParseJSON(s) {
+  try { return JSON.parse(s) } catch { return null }
+}
+
+// ── /api/roblox — plugin-facing generation endpoint ──
+//
+// Accepts an API key (not a Firebase ID token, since the Lua plugin can't
+// easily get one). Returns the Plixiele model JSON as a single response —
+// no SSE streaming, because Roblox HttpService doesn't expose chunked reads.
+//
+// Cost: 10 credits (same as a regular gen). Refunds on upstream failure.
+
+export const generateRoblox = onRequest(
+  {
+    region: 'us-central1',
+    secrets: [ANTHROPIC_API_KEY, GEMINI_API_KEY],
+    cors: false,
+    timeoutSeconds: 540,
+    memory: '512MiB',
+  },
+  async (req, res) => {
+    // Roblox Studio plugins don't send an Origin header — accept all callers
+    // here (the API key itself is the auth surface).
+    res.set('Access-Control-Allow-Origin', '*')
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+    if (req.method === 'OPTIONS') { res.status(204).end(); return }
+    if (req.method !== 'POST')   { res.status(405).end(); return }
+
+    const keyDoc = await requireApiKey(req, res)
+    if (!keyDoc) return
+    const { uid } = keyDoc
+
+    const prompt = String(req.body?.prompt || '').trim().slice(0, 2000)
+    if (!prompt) { res.status(400).json({ error: 'Missing prompt' }); return }
+
+    // Bootstrap the user's profile so credits exist (in case they signed up
+    // through the web app a while ago and never hit the bootstrap endpoint).
+    let userRecord
+    try { userRecord = await getAuth().getUser(uid) }
+    catch { res.status(401).json({ error: 'API key references a deleted user' }); return }
+
+    await ensureProfile(uid, userRecord.email)
+    const cost = COST.gen
+
+    try {
+      await consumeCredits(uid, cost)
+    } catch (e) {
+      if (e.message === 'INSUFFICIENT_CREDITS') {
+        res.status(402).json({ error: 'Out of credits. Upgrade your plan in Plixiele.', cost })
+        return
+      }
+      res.status(500).json({ error: e.message }); return
+    }
+
+    // Single Claude Sonnet call with the standard model JSON prompt.
+    let model
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY.value(),
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 24000,
+          system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: `Create a 3D model: ${prompt}` }],
+        }),
+      })
+      if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 240)}`)
+      const j = await r.json()
+      const text = (j?.content || []).map(b => b.text || '').join('')
+      model = parseModelJSONServer(text)
+    } catch (e) {
+      console.error('generateRoblox: Claude failed:', e.message)
+      await db.doc(`users/${uid}`).update({ credits: FieldValue.increment(cost) })
+      res.status(500).json({ error: 'Generation failed — try again' })
+      return
+    }
+
+    // Touch lastUsed on the key for the user's records.
+    db.doc(`users/${uid}/apiKeys/${keyDoc.keyId}`)
+      .update({ lastUsed: FieldValue.serverTimestamp() })
+      .catch(() => {})
+
+    res.json({ model, prompt })
+  },
+)
+
+// ── API keys (for external integrations: Roblox plugin, etc.) ──
+//
+// Two-doc model so we get both "list a user's keys" and "look up a key →
+// uid" without a Firestore composite index:
+//   users/{uid}/apiKeys/{keyId}  — owner-readable list metadata
+//   apiKeys/{keyValue}           — backend-only key→uid lookup
+//
+// Only Cloud Functions (using the admin SDK) write either doc; firestore.rules
+// denies all client writes. Clients call createApiKey/revokeApiKey functions.
+
+function generateKeyValue() {
+  // pk_ prefix + 32 url-safe chars. Plenty of entropy (~192 bits).
+  return 'pk_' + crypto.randomBytes(24).toString('base64url')
+}
+
+export const createApiKey = onRequest(
+  { region: 'us-central1', cors: false, timeoutSeconds: 30, memory: '256MiB' },
+  async (req, res) => {
+    setCors(req, res)
+    if (req.method === 'OPTIONS') { res.status(204).end(); return }
+    if (req.method !== 'POST')   { res.status(405).end(); return }
+    const user = await requireUser(req, res)
+    if (!user) return
+
+    const name = String(req.body?.name || 'API key').slice(0, 60)
+    const keyValue = generateKeyValue()
+    const keyId = crypto.randomBytes(8).toString('hex')
+
+    const created = FieldValue.serverTimestamp()
+    try {
+      // Mirror writes: lookup doc + user-visible metadata doc.
+      await db.doc(`apiKeys/${keyValue}`).set({
+        uid: user.uid, keyId, name, createdAt: created,
+      })
+      await db.doc(`users/${user.uid}/apiKeys/${keyId}`).set({
+        keyId, name, createdAt: created,
+        keyPrefix: keyValue.slice(0, 6),
+        keySuffix: keyValue.slice(-4),
+        // Don't store the full key here — clients see it once in the response
+        // and never again. Forces them to copy now or revoke + reissue later.
+      })
+      res.json({ key: keyValue, keyId, name })
+    } catch (e) {
+      console.error('createApiKey failed:', e)
+      res.status(500).json({ error: e.message })
+    }
+  },
+)
+
+export const revokeApiKey = onRequest(
+  { region: 'us-central1', cors: false, timeoutSeconds: 30, memory: '256MiB' },
+  async (req, res) => {
+    setCors(req, res)
+    if (req.method === 'OPTIONS') { res.status(204).end(); return }
+    if (req.method !== 'POST')   { res.status(405).end(); return }
+    const user = await requireUser(req, res)
+    if (!user) return
+
+    const keyId = String(req.body?.keyId || '')
+    if (!keyId) { res.status(400).json({ error: 'Missing keyId' }); return }
+
+    try {
+      // Find the lookup doc by scanning the user's keys for the matching keyId.
+      // Cheaper than a query because there are only ever a handful per user.
+      const snap = await db.doc(`users/${user.uid}/apiKeys/${keyId}`).get()
+      if (!snap.exists) { res.status(404).json({ error: 'Key not found' }); return }
+
+      // Walk the global apiKeys collection for the matching keyId. Small N
+      // (one user's keys), but if this gets slow we'll add an index.
+      const lookup = await db.collection('apiKeys').where('uid', '==', user.uid).where('keyId', '==', keyId).get()
+      const batch = db.batch()
+      lookup.forEach(d => batch.delete(d.ref))
+      batch.delete(snap.ref)
+      await batch.commit()
+
+      res.json({ ok: true })
+    } catch (e) {
+      console.error('revokeApiKey failed:', e)
+      res.status(500).json({ error: e.message })
+    }
+  },
+)
+
+// Used by /api/roblox (and any future plugin endpoint) to authenticate via
+// a Bearer API key instead of a Firebase ID token.
+async function requireApiKey(req, res) {
+  const auth = req.headers.authorization || ''
+  const m = auth.match(/^Bearer\s+(pk_[A-Za-z0-9_-]+)$/)
+  if (!m) { res.status(401).json({ error: 'Missing or malformed API key' }); return null }
+  try {
+    const snap = await db.doc(`apiKeys/${m[1]}`).get()
+    if (!snap.exists) { res.status(401).json({ error: 'Invalid API key' }); return null }
+    return snap.data() // { uid, keyId, name, createdAt }
+  } catch (e) {
+    console.error('requireApiKey lookup failed:', e)
+    res.status(500).json({ error: e.message })
+    return null
+  }
+}
 
 // ── Stripe subscription → user.plan sync ──
 // Map a Stripe price ID to one of our plan tiers. Test-mode and live-mode

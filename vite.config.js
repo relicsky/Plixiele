@@ -28,6 +28,21 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '',
       },
+      '/api/roblox': {
+        target: `${FN_BASE}/generateRoblox`,
+        changeOrigin: true,
+        rewrite: () => '',
+      },
+      '/api/keys/revoke': {
+        target: `${FN_BASE}/revokeApiKey`,
+        changeOrigin: true,
+        rewrite: () => '',
+      },
+      '/api/keys': {
+        target: `${FN_BASE}/createApiKey`,
+        changeOrigin: true,
+        rewrite: () => '',
+      },
     },
   },
 })

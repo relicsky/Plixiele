@@ -10,7 +10,7 @@ service cloud.firestore {
       allow create: if request.auth.uid == uid;
       allow update: if request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['name', 'email', 'updatedAt', 'acceptedTermsAt']);
+                       .hasOnly(['name', 'email', 'avatarUrl', 'updatedAt', 'acceptedTermsAt']);
       allow delete: if false;
 
       match /sessions/{sid} {
@@ -25,6 +25,17 @@ service cloud.firestore {
       match /models/{mid} {
         allow read, write: if request.auth.uid == uid;
       }
+      // API keys for external integrations (Roblox plugin, etc.).
+      // Clients can list/read their own; only Cloud Functions write/delete.
+      match /apiKeys/{keyId} {
+        allow read: if request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    // Global key → uid lookup. Backend-only; never readable by clients.
+    match /apiKeys/{key} {
+      allow read, write: if false;
     }
 
     // Shared community feed

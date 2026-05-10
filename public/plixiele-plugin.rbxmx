@@ -1,0 +1,324 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+  <Item class="Script" referent="RBX0">
+    <Properties>
+      <bool name="Disabled">false</bool>
+      <Content name="LinkedSource"><null></null></Content>
+      <string name="Name">Plixiele</string>
+      <ProtectedString name="Source"><![CDATA[--!nocheck
+-- Plixiele Studio Plugin
+-- Generates 3D models from a text prompt using Plixiele's AI backend.
+-- Get your API key at https://plixiele-sign-in.web.app → Account → API Keys.
+
+local HttpService = game:GetService("HttpService")
+local Selection   = game:GetService("Selection")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
+
+local API_BASE   = "https://plixiele-sign-in.web.app/api/roblox"
+local STUD_SCALE = 4 -- Three.js units → Roblox studs. 1 unit = 4 studs feels right.
+
+-- ── Toolbar + dock widget ──
+local toolbar = plugin:CreateToolbar("Plixiele")
+local toggleButton = toolbar:CreateButton("Plixiele", "Generate 3D models from a prompt", "rbxasset://textures/StudioToolbox/SearchClear.png")
+
+local widgetInfo = DockWidgetPluginGuiInfo.new(
+    Enum.InitialDockState.Right,
+    false,    -- initial enabled state
+    false,    -- override saved enabled state
+    340, 480, -- floating size
+    300, 380  -- min size
+)
+local widget = plugin:CreateDockWidgetPluginGui("PlixielePanel", widgetInfo)
+widget.Title = "Plixiele"
+
+toggleButton.Click:Connect(function()
+    widget.Enabled = not widget.Enabled
+end)
+
+-- ── UI ──
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(1, 0, 1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = widget
+
+local pad = Instance.new("UIPadding", mainFrame)
+pad.PaddingTop    = UDim.new(0, 14)
+pad.PaddingBottom = UDim.new(0, 14)
+pad.PaddingLeft   = UDim.new(0, 14)
+pad.PaddingRight  = UDim.new(0, 14)
+
+local layout = Instance.new("UIListLayout", mainFrame)
+layout.Padding = UDim.new(0, 10)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function makeLabel(text, order)
+    local lbl = Instance.new("TextLabel")
+    lbl.LayoutOrder = order
+    lbl.Size = UDim2.new(1, 0, 0, 16)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(150, 150, 160)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.Parent = mainFrame
+    return lbl
+end
+
+local function makeInput(placeholder, order, multiline)
+    local box = Instance.new("TextBox")
+    box.LayoutOrder = order
+    box.Size = UDim2.new(1, 0, 0, multiline and 80 or 32)
+    box.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+    box.BorderColor3 = Color3.fromRGB(50, 50, 60)
+    box.BorderSizePixel = 1
+    box.TextColor3 = Color3.fromRGB(230, 230, 235)
+    box.PlaceholderText = placeholder
+    box.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 13
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+    box.MultiLine = multiline or false
+    box.ClearTextOnFocus = false
+    box.TextWrapped = multiline or false
+    box.Parent = mainFrame
+    local boxPad = Instance.new("UIPadding", box)
+    boxPad.PaddingLeft = UDim.new(0, 10)
+    boxPad.PaddingRight = UDim.new(0, 10)
+    boxPad.PaddingTop = UDim.new(0, 6)
+    boxPad.PaddingBottom = UDim.new(0, 6)
+    return box
+end
+
+makeLabel("API KEY", 1)
+local keyBox = makeInput("pk_…  (saved locally between sessions)", 2)
+keyBox.Text = plugin:GetSetting("plixiele_api_key") or ""
+
+makeLabel("PROMPT", 3)
+local promptBox = makeInput("e.g. ornate Greek vase with gold trim", 4, true)
+
+local generateBtn = Instance.new("TextButton")
+generateBtn.LayoutOrder = 5
+generateBtn.Size = UDim2.new(1, 0, 0, 36)
+generateBtn.BackgroundColor3 = Color3.fromRGB(124, 207, 255)
+generateBtn.BorderSizePixel = 0
+generateBtn.Text = "Generate"
+generateBtn.TextColor3 = Color3.fromRGB(4, 20, 26)
+generateBtn.Font = Enum.Font.GothamBold
+generateBtn.TextSize = 14
+generateBtn.AutoButtonColor = true
+generateBtn.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.LayoutOrder = 6
+statusLabel.Size = UDim2.new(1, 0, 0, 60)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = ""
+statusLabel.TextColor3 = Color3.fromRGB(170, 170, 180)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.TextWrapped = true
+statusLabel.Parent = mainFrame
+
+-- ── JSON model → Roblox parts ──
+local function dominantColorFromUniforms(uniforms)
+    if type(uniforms) ~= "table" then return Color3.new(0.6, 0.6, 0.7) end
+    -- Prefer common color uniform names; fall back to the first 3-element array.
+    local preferred = { "uColor1", "uColor", "color", "uBaseColor", "uTint" }
+    for _, key in ipairs(preferred) do
+        local def = uniforms[key]
+        if type(def) == "table" and type(def.value) == "table" and #def.value >= 3 then
+            return Color3.new(def.value[1], def.value[2], def.value[3])
+        end
+    end
+    for _, def in pairs(uniforms) do
+        if type(def) == "table" and type(def.value) == "table" and #def.value >= 3 then
+            local v = def.value
+            -- Skip vectors that look like positions (large magnitudes)
+            if math.abs(v[1]) <= 1 and math.abs(v[2]) <= 1 and math.abs(v[3]) <= 1 then
+                return Color3.new(v[1], v[2], v[3])
+            end
+        end
+    end
+    return Color3.new(0.6, 0.6, 0.7)
+end
+
+-- Convert a Plixiele part spec into a Roblox Part. Returns nil if the geometry
+-- type isn't supported in v1 (LatheGeometry, ExtrudeGeometry — those need
+-- EditableMesh, coming in plugin v2).
+local function partFromSpec(spec)
+    local geom = spec.geometry or {}
+    local params = geom.params or {}
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.Material = Enum.Material.SmoothPlastic
+    part.TopSurface = Enum.SurfaceType.Smooth
+    part.BottomSurface = Enum.SurfaceType.Smooth
+
+    local gtype = geom.type or "BoxGeometry"
+    if gtype == "BoxGeometry" then
+        part.Shape = Enum.PartType.Block
+        part.Size = Vector3.new(
+            (params[1] or 1) * STUD_SCALE,
+            (params[2] or 1) * STUD_SCALE,
+            (params[3] or 1) * STUD_SCALE
+        )
+    elseif gtype == "SphereGeometry" then
+        part.Shape = Enum.PartType.Ball
+        local r = (params[1] or 1) * STUD_SCALE
+        part.Size = Vector3.new(r * 2, r * 2, r * 2)
+    elseif gtype == "CylinderGeometry" then
+        part.Shape = Enum.PartType.Cylinder
+        local r = (params[1] or params[2] or 0.5) * STUD_SCALE
+        local h = (params[3] or 2) * STUD_SCALE
+        part.Size = Vector3.new(h, r * 2, r * 2)
+    elseif gtype == "ConeGeometry" then
+        -- No cone primitive in Roblox; approximate with a wedge stack would
+        -- be heavy. Use a SpecialMesh on a Block with FileMesh would need an
+        -- assetId. For now use a thin cylinder + ball cap. Good-enough for v1.
+        part.Shape = Enum.PartType.Cylinder
+        local r = (params[1] or 0.5) * STUD_SCALE
+        local h = (params[2] or 1) * STUD_SCALE
+        part.Size = Vector3.new(h, r, r)
+    elseif gtype == "TorusGeometry" or gtype == "TorusKnotGeometry"
+        or gtype == "OctahedronGeometry" or gtype == "IcosahedronGeometry"
+        or gtype == "TetrahedronGeometry" or gtype == "DodecahedronGeometry" then
+        -- Approximate exotic shapes with a sphere of similar bounding radius.
+        part.Shape = Enum.PartType.Ball
+        local r = (params[1] or 1) * STUD_SCALE
+        part.Size = Vector3.new(r * 2, r * 2, r * 2)
+    elseif gtype == "LatheGeometry" or gtype == "ExtrudeGeometry" then
+        -- v2 will use EditableMesh. For now drop a placeholder ball so the
+        -- model is still recognizable in shape.
+        part.Shape = Enum.PartType.Ball
+        part.Size = Vector3.new(STUD_SCALE, STUD_SCALE, STUD_SCALE)
+    elseif gtype == "PlaneGeometry" then
+        part.Shape = Enum.PartType.Block
+        part.Size = Vector3.new(
+            (params[1] or 1) * STUD_SCALE,
+            0.05 * STUD_SCALE,
+            (params[2] or 1) * STUD_SCALE
+        )
+    else
+        part.Shape = Enum.PartType.Block
+        part.Size = Vector3.new(STUD_SCALE, STUD_SCALE, STUD_SCALE)
+    end
+
+    -- Position + rotation (Three.js Y-up matches Roblox Y-up; coordinate
+    -- handedness differs, so flip Z for parity).
+    local pos = spec.position or {0, 0, 0}
+    local rot = spec.rotation or {0, 0, 0}
+    local cf  = CFrame.new(
+        (pos[1] or 0) * STUD_SCALE,
+        (pos[2] or 0) * STUD_SCALE,
+        -(pos[3] or 0) * STUD_SCALE
+    ) * CFrame.Angles(rot[1] or 0, rot[2] or 0, -(rot[3] or 0))
+    part.CFrame = cf
+
+    part.Color = dominantColorFromUniforms(spec.uniforms)
+    part.Name = spec.name or "Part"
+    return part
+end
+
+local function buildModel(modelData, prompt)
+    local container = Instance.new("Model")
+    container.Name = "Plixiele_" .. (prompt:gsub("[^%w%s]", ""):sub(1, 28):gsub("%s+", "_"))
+
+    local parts = modelData.parts
+    if not parts then parts = { modelData } end
+
+    for _, spec in ipairs(parts) do
+        local p = partFromSpec(spec)
+        p.Parent = container
+    end
+
+    container.Parent = workspace
+    if container.PrimaryPart == nil and #container:GetChildren() > 0 then
+        container.PrimaryPart = container:FindFirstChildWhichIsA("BasePart")
+    end
+    return container
+end
+
+-- ── Generate handler ──
+generateBtn.MouseButton1Click:Connect(function()
+    local key = keyBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    local prompt = promptBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    if key == "" then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = "Enter your Plixiele API key first."
+        return
+    end
+    if prompt == "" then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = "Type a prompt."
+        return
+    end
+
+    plugin:SetSetting("plixiele_api_key", key)
+    generateBtn.Active = false
+    generateBtn.Text = "Generating…"
+    statusLabel.TextColor3 = Color3.fromRGB(170, 170, 180)
+    statusLabel.Text = "Calling Plixiele…"
+
+    local ok, response = pcall(function()
+        return HttpService:RequestAsync({
+            Url = API_BASE,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = "Bearer " .. key,
+            },
+            Body = HttpService:JSONEncode({ prompt = prompt }),
+        })
+    end)
+
+    generateBtn.Active = true
+    generateBtn.Text = "Generate"
+
+    if not ok then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = "Network error: " .. tostring(response)
+        return
+    end
+
+    local data
+    pcall(function() data = HttpService:JSONDecode(response.Body) end)
+
+    if not response.Success then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = string.format("Error %d: %s",
+            response.StatusCode,
+            (data and data.error) or response.StatusMessage or "Unknown")
+        return
+    end
+
+    if not data or not data.model then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = "Empty response from Plixiele."
+        return
+    end
+
+    local recording = ChangeHistoryService:TryBeginRecording("Plixiele Generate", "Plixiele")
+    local ok2, err = pcall(function()
+        local model = buildModel(data.model, prompt)
+        Selection:Set({ model })
+        local count = #model:GetChildren()
+        statusLabel.TextColor3 = Color3.fromRGB(124, 255, 168)
+        statusLabel.Text = string.format("Created %s with %d part%s.", model.Name, count, count == 1 and "" or "s")
+    end)
+    if recording then
+        ChangeHistoryService:FinishRecording(recording, ok2 and Enum.FinishRecordingOperation.Commit or Enum.FinishRecordingOperation.Cancel)
+    end
+
+    if not ok2 then
+        statusLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+        statusLabel.Text = "Build error: " .. tostring(err)
+    end
+end)
+]]></ProtectedString>
+    </Properties>
+  </Item>
+</roblox>
