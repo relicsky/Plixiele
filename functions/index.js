@@ -231,14 +231,24 @@ export const geminiProxy = onRequest(
 )
 
 // ── Stripe subscription → user.plan sync ──
-// Map a Stripe price ID (set in Stripe dashboard) to one of our plan tiers.
-// Configure these IDs as Firebase Functions config or hard-code after creating
-// products in the Stripe dashboard via the firestore-stripe-payments extension.
+// Map a Stripe price ID to one of our plan tiers. Test-mode and live-mode
+// price IDs are different objects — list both here so we don't have to
+// re-edit when flipping the extension between modes.
+//
+// Find each ID in Stripe → Products → (your product) → Pricing section,
+// or in Firestore at products/{productId}/prices/{priceId}.
+//
+// SHIP CHECK: if any value is the string 'TODO_…', paid checkout will silently
+// downgrade the user to free. Fill these in before deploying functions.
 const PRICE_TO_PLAN = {
-  // Fill in once Stripe products exist:
-  // 'price_xxxBasic':   'basic',
-  // 'price_xxxPro':     'pro',
-  // 'price_xxxPremium': 'premium',
+  // Test mode (sk_test_…)
+  'TODO_TEST_PRICE_BASIC':   'basic',
+  'TODO_TEST_PRICE_PRO':     'pro',
+  'TODO_TEST_PRICE_PREMIUM': 'premium',
+  // Live mode (sk_live_…)
+  'TODO_LIVE_PRICE_BASIC':   'basic',
+  'TODO_LIVE_PRICE_PRO':     'pro',
+  'TODO_LIVE_PRICE_PREMIUM': 'premium',
 }
 
 export const onSubscriptionWrite = onDocumentWritten(
@@ -250,6 +260,9 @@ export const onSubscriptionWrite = onDocumentWritten(
     const status = after.status
     const priceId = after.items?.[0]?.price?.id || after.price?.id
     const active = status === 'active' || status === 'trialing'
+    if (active && priceId && !PRICE_TO_PLAN[priceId]) {
+      console.error(`onSubscriptionWrite: active sub for uid=${uid} has unmapped priceId=${priceId}. Plan will fall back to 'free'. Add this priceId to PRICE_TO_PLAN in functions/index.js and redeploy.`)
+    }
     const plan = active && priceId && PRICE_TO_PLAN[priceId] ? PRICE_TO_PLAN[priceId] : 'free'
     await db.doc(`users/${uid}`).set({
       plan,

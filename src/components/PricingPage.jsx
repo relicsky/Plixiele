@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import { db } from '../lib/firebase.js'
 import { collection, doc, addDoc, onSnapshot, query, where } from 'firebase/firestore'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 
 const TIERS = [
   {
@@ -63,11 +64,29 @@ const TIERS = [
   },
 ]
 
+// Read ?upgrade=success | ?upgrade=cancel set by the Stripe checkout redirect.
+function readUpgradeParam() {
+  if (typeof window === 'undefined') return null
+  const v = new URLSearchParams(window.location.search).get('upgrade')
+  return v === 'success' || v === 'cancel' ? v : null
+}
+
 export default function PricingPage({ onClose }) {
   const { user, plan, credits } = useApp()
   const [prices, setPrices] = useState({})
   const [busy, setBusy] = useState(null)
+  const [portalBusy, setPortalBusy] = useState(false)
   const [error, setError] = useState('')
+  const [upgradeFlash, setUpgradeFlash] = useState(() => readUpgradeParam())
+
+  // Clear ?upgrade=… from the URL after we've shown the banner once, so a
+  // refresh doesn't keep flashing it.
+  useEffect(() => {
+    if (!upgradeFlash) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('upgrade')
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+  }, [upgradeFlash])
 
   // Load active prices from the firestore-stripe-payments extension.
   useEffect(() => {
@@ -120,6 +139,25 @@ export default function PricingPage({ onClose }) {
     }
   }
 
+  // Opens the Stripe-hosted customer portal so users can change card, cancel,
+  // or download invoices. The firestore-stripe-payments extension installs a
+  // callable function under the name below (default install).
+  async function openPortal() {
+    if (!user) return
+    setPortalBusy(true)
+    setError('')
+    try {
+      const fns = getFunctions(undefined, 'us-central1')
+      const createPortalLink = httpsCallable(fns, 'ext-firestore-stripe-payments-createPortalLink')
+      const { data } = await createPortalLink({ returnUrl: window.location.origin })
+      if (data?.url) window.location.assign(data.url)
+      else throw new Error('No portal URL returned')
+    } catch (e) {
+      setError(e.message || 'Could not open customer portal')
+      setPortalBusy(false)
+    }
+  }
+
   return (
     <div className="pricing-page">
       <div className="pricing-head">
@@ -130,7 +168,24 @@ export default function PricingPage({ onClose }) {
         </div>
       </div>
 
+      {upgradeFlash === 'success' && (
+        <p className="pricing-flash pricing-flash-ok">
+          Payment received — your plan should update within a few seconds.
+        </p>
+      )}
+      {upgradeFlash === 'cancel' && (
+        <p className="pricing-flash">Checkout canceled. No charge was made.</p>
+      )}
       {error && <p className="pricing-error">{error}</p>}
+
+      {plan !== 'free' && (
+        <p className="pricing-manage">
+          <button className="pricing-manage-btn" onClick={openPortal} disabled={portalBusy}>
+            {portalBusy ? 'Opening…' : 'Manage subscription'}
+          </button>
+          <span className="pricing-manage-hint">Update card, change plan, or cancel.</span>
+        </p>
+      )}
 
       <div className="pricing-grid">
         {TIERS.map((t) => {
