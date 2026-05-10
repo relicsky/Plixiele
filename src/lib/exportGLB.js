@@ -1,13 +1,6 @@
 import * as THREE from 'three'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
-
-function makeGeom(def) {
-  try {
-    const G = THREE[def?.type]
-    if (typeof G !== 'function') return new THREE.SphereGeometry(1, 32, 32)
-    return new G(...(def.params || []))
-  } catch { return new THREE.SphereGeometry(1, 32, 32) }
-}
+import { buildGeometry as makeGeom } from './buildGeometry.js'
 
 function bakedColor(uniforms) {
   const keys = ['uColor1', 'uColor', 'color', 'uBaseColor', 'uTint']

@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { downloadModelGLB } from '../lib/exportGLB.js'
+import { buildGeometry } from '../lib/buildGeometry.js'
 import PublishDialog from './PublishDialog.jsx'
 
 const DEFAULT_VERT = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;varying vec3 vWorldPosition;
@@ -27,13 +28,10 @@ function buildUniforms(u) {
   return base
 }
 
-function makeGeomSafe(geomDef) {
-  try {
-    const G = THREE[geomDef?.type]
-    if (typeof G !== 'function') return new THREE.SphereGeometry(1, 48, 48)
-    return new G(...(geomDef.params || []))
-  } catch { return new THREE.SphereGeometry(1, 48, 48) }
-}
+// Geometry construction lives in src/lib/buildGeometry.js so all renderers
+// (here, Shader Lab, Scene Builder, GLB export) stay in sync — adding a new
+// geometry type only needs editing that one helper + the system prompt.
+const makeGeomSafe = buildGeometry
 
 function SingleModel({ modelData }) {
   const meshRef = useRef()

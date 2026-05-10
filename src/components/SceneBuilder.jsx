@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext.jsx'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import { generateScene } from '../lib/sceneClient.js'
 import { downloadSceneGLB } from '../lib/exportGLB.js'
+import { buildGeometry } from '../lib/buildGeometry.js'
 
 const TERRAIN_SIZE = 24
 const TERRAIN_SEG = 60
@@ -34,13 +35,9 @@ const DEFAULT_V = `varying vec2 vUv;varying vec3 vNormal;varying vec3 vPosition;
 void main(){vUv=uv;vNormal=normalize(normalMatrix*normal);vPosition=position;vWorldPosition=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`
 const DEFAULT_F = `uniform float uTime;varying vec3 vNormal;void main(){float f=pow(1.-abs(dot(vNormal,normalize(vec3(0,0,1)))),2.5);gl_FragColor=vec4(mix(vec3(.04,.1,.4),vec3(.4,.7,1.),f),.92);}`
 
-function makeGeom(def) {
-  try {
-    const G = THREE[def?.type]
-    if (typeof G !== 'function') return new THREE.SphereGeometry(1, 32, 32)
-    return new G(...(def.params || []))
-  } catch { return new THREE.SphereGeometry(1, 32, 32) }
-}
+// Geometry construction is shared via src/lib/buildGeometry.js — see that file
+// to add new types (Lathe, Extrude, etc.).
+const makeGeom = buildGeometry
 
 function buildUniforms(u) {
   const base = { uTime: { value: 0 }, uResolution: { value: new THREE.Vector2(1, 1) } }

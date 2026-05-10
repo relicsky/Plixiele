@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { COMMUNITY_MODELS } from '../lib/communityModels.js'
 import { useApp } from '../context/AppContext.jsx'
+import { buildGeometry } from '../lib/buildGeometry.js'
 
 // ── mini viewer (single WebGL context per card, mounted on hover) ──
 const V_DEF = `varying vec3 vNormal;varying vec3 vWorldPosition;void main(){vNormal=normalize(normalMatrix*normal);vWorldPosition=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`
@@ -15,12 +16,8 @@ function MiniMesh({ modelData }) {
   const hasParts = !!modelData.parts
 
   const firstPart = hasParts ? modelData.parts[0] : modelData
-  const geo = useMemo(() => {
-    try {
-      const G = THREE[firstPart.geometry?.type || 'SphereGeometry']
-      return new G(...(firstPart.geometry?.params || [1, 32, 32]))
-    } catch { return new THREE.SphereGeometry(1, 32, 32) }
-  }, [modelData.id || modelData.timestamp])
+  const geo = useMemo(() => buildGeometry(firstPart.geometry),
+    [modelData.id || modelData.timestamp]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const uni = useMemo(() => ({ uTime: { value: 0 } }), [])
 
